@@ -42,6 +42,10 @@ export default function Home() {
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
   const [savingImg, setSavingImg] = useState(false);
+  const [newRowName, setNewRowName] = useState('');
+  const [newRowSuggestions, setNewRowSuggestions] = useState<Sku[]>([]);
+  const [showNewRowDropdown, setShowNewRowDropdown] = useState(false);
+  const newRowRef = useRef<HTMLDivElement>(null);
   const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
   const [preparerName, setPreparerName] = useState('');
   const [showHistory, setShowHistory] = useState(false);
@@ -66,6 +70,24 @@ export default function Home() {
     try { const r = await fetch('/api/skus?limit=500'); const d = await r.json(); if (Array.isArray(d)) setAllSkus(d); } catch {}
   }, []);
   useEffect(() => { loadAllSkus(); loadAllCustomers(); }, [loadAllSkus, loadAllCustomers]);
+
+  // New row product search
+  useEffect(() => {
+    if (!newRowName.trim()) { setNewRowSuggestions([]); return; }
+    const t = setTimeout(() => {
+      const q = newRowName.toLowerCase();
+      const matches = allSkus.filter(s => s.skuName.toLowerCase().includes(q) || (s.brand && s.brand.toLowerCase().includes(q))).slice(0, 8);
+      setNewRowSuggestions(matches);
+      setShowNewRowDropdown(matches.length > 0);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [newRowName, allSkus]);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (newRowRef.current && !newRowRef.current.contains(e.target as Node)) setShowNewRowDropdown(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
 
   const loadRecycleBin = useCallback(async () => {
     try { const r = await fetch('/api/skus?deleted=1&limit=500'); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
@@ -124,6 +146,32 @@ export default function Home() {
     if (selectedIds.size === 0) return;
     await fetch('/api/skus?ids=' + [...selectedIds].join(',') + '&restore=1', { method: 'DELETE' });
     setSelectedIds(new Set()); loadRecycleBin(); loadAllSkus();
+  };
+
+    const addNewRowItem = (sku?: Sku, customName?: string, customPrice?: string) => {
+    const name = sku ? sku.skuName : (customName || newRowName.trim());
+    if (!name) return;
+    const brand = sku ? sku.brand : '';
+    const unit = sku ? sku.unit : '';
+    const price = customPrice || (sku ? (customerPrices[sku.skuName] || sku.costPrice) : '0');
+    setLineItems(p => [...p, {
+      skuName: name, brand, unit,
+      quantity: '1', unitPrice: parseFloat(price).toFixed(2),
+      total: parseFloat(price).toFixed(2),
+    }]);
+    setNewRowName('');
+    setShowNewRowDropdown(false);
+    // If it's a new product, auto-save as SKU and customer price
+    if (!sku && customName) {
+      fetch('/api/skus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skuName: customName, brand: '', costPrice: customPrice || '0', unit: '' }) })
+        .then(() => loadAllSkus()).catch(() => {});
+      if (selectedCustomer && customPrice) {
+        fetch('/api/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customerId: selectedCustomer.id, skuName: customName, price: customPrice }) })
+          .catch(() => {});
+      }
+    }
   };
 
   const addToOrder = (sku: Sku) => {
