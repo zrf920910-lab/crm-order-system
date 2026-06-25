@@ -40,6 +40,8 @@ export default function Home() {
   const [stampPos, setStampPos] = useState({ x: 0, y: 0 }); const [draggingStamp, setDraggingStamp] = useState(false);
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
+  const [preparerName, setPreparerName] = useState('');
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,7 @@ export default function Home() {
   };
   const removeItem = (idx: number) => setLineItems(p => p.filter((_, i) => i !== idx));
 
-  const newOrder = () => { setLineItems([]); setSelectedCustomer(null); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setOrderNotes(''); setStampImage(''); setStampPos({ x: 0, y: 0 }); setSavedMsg(''); };
+  const newOrder = () => { setLineItems([]); setSelectedCustomer(null); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setOrderNotes(''); setStampImage(''); setStampPos({ x: 0, y: 0 }); setPreparerName(''); setSavedMsg(''); };
 
   const handleStamp = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setStampImage(r.result as string); r.readAsDataURL(f); };
 
@@ -267,7 +269,16 @@ export default function Home() {
           {lineItems.length > 0 && <div className="flex justify-end mt-2 pt-2 border-t border-gray-300"><span className="text-base font-bold">合计: ¥{totalAmount.toFixed(2)}</span></div>}
         </div>
         <div className="p-3 border-t bg-white space-y-2">
-          <div className="flex gap-2 items-end"><div className="flex-1"><label className="text-xs text-gray-500 mb-0.5 block">备注</label><input type="text" value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="订单备注..." className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div><div><label className="text-xs text-gray-500 mb-0.5 block">公章</label><input ref={stampRef} type="file" accept="image/*" onChange={handleStamp} className="hidden" /><button onClick={() => stampRef.current?.click()} className={'px-2 py-1.5 text-xs rounded border ' + (stampImage ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50')}>{stampImage ? '已上传' : '上传公章'}</button></div></div>
+          <div className="space-y-2">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1"><label className="text-xs text-gray-500 mb-0.5 block">公司名称</label><input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div>
+              <div className="w-24"><label className="text-xs text-gray-500 mb-0.5 block">制单人</label><input type="text" value={preparerName} onChange={e => setPreparerName(e.target.value)} placeholder="姓名" className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div>
+            </div>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1"><label className="text-xs text-gray-500 mb-0.5 block">备注</label><input type="text" value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="订单备注..." className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div>
+              <div><label className="text-xs text-gray-500 mb-0.5 block">公章</label><input ref={stampRef} type="file" accept="image/*" onChange={handleStamp} className="hidden" /><button onClick={() => stampRef.current?.click()} className={'px-2 py-1.5 text-xs rounded border ' + (stampImage ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50')}>{stampImage ? '已上传' : '上传公章'}</button></div>
+            </div>
+          </div>
           <div className="flex gap-2"><button onClick={handleSave} disabled={saving || lineItems.length === 0 || !customerName.trim()} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{saving ? '保存中...' : '保存订单'}</button><button onClick={handlePrint} disabled={printing || lineItems.length === 0} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{printing ? '生成中...' : '打印PDF'}</button></div>
           {savedMsg && <div className={'text-xs text-center py-1 rounded font-medium ' + (savedMsg.startsWith('订单已保存') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50')}>✓ {savedMsg}</div>}
         </div>
@@ -278,7 +289,8 @@ export default function Home() {
         <div className="p-2.5 bg-white border-b text-sm font-bold text-gray-700">打印预览</div>
         <div className="flex-1 overflow-y-auto p-3">
           <div ref={previewRef} className="bg-white p-4 shadow-md" style={{ fontFamily: 'sans-serif', fontSize: '10px' }}>
-            <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>销 售 单</div>
+            <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', marginBottom: '2px' }}>{companyName}</div>
+            <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>销 售 单</div>
             <div style={{ fontSize: '11px', marginBottom: '8px' }}><div>日期: {new Date().toLocaleDateString('zh-CN')}</div></div>
             <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>客户: {customerName || '--'}</div>
             <div style={{ fontSize: '10px', marginBottom: '12px', color: '#555' }}><div>电话: {customerPhone || '--'}</div><div>地址: {customerAddress || '--'}</div></div>
@@ -289,13 +301,16 @@ export default function Home() {
             </table>
             {lineItems.length > 0 && (<><div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', marginBottom: '6px' }}>合计: ¥{totalAmount.toFixed(2)}</div><div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>大写: {numCN(totalAmount)}</div></>)}
             {orderNotes && <div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>备注: {orderNotes}</div>}
-            {stampImage && <div style={{ position: 'relative', marginTop: '10px', minHeight: '100px' }}>
+            {stampImage && <div style={{ position: 'relative', marginTop: '8px', height: '90px', overflow: 'visible' }}>
                 <img src={stampImage} alt="公章" draggable={false}
                   onMouseDown={stampDragStart} onMouseMove={stampDragMove} onMouseUp={stampDragEnd} onMouseLeave={stampDragEnd}
                   style={{ position: 'absolute', right: (80 + stampPos.x) + 'px', top: stampPos.y + 'px', width: '80px', height: '80px', opacity: 0.8, cursor: draggingStamp ? 'grabbing' : 'grab', userSelect: 'none' }} />
-                <div style={{ fontSize: '9px', color: '#999', marginTop: '5px' }}>拖拽公章可调整位置</div>
+                <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '9px', color: '#999' }}>拖拽公章可调整位置</div>
               </div>}
-            <div style={{ marginTop: '15px', fontSize: '10px' }}><div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px' }}>制单人:</div><div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px', marginLeft: '10%' }}>签收人:</div></div>
+            <div style={{ marginTop: '15px', fontSize: '10px', clear: 'both' }}>
+              <div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px' }}>制单人:{preparerName ? ' ' + preparerName : ''}</div>
+              <div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px', marginLeft: '10%' }}>签收人:</div>
+            </div>
           </div>
         </div>
       </div>
