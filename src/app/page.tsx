@@ -144,16 +144,19 @@ export default function Home() {
     const name = customerName.trim();
     if (!name || lineItems.length === 0) return false;
     let lastError = '';
+      const fetchWithTimeout = (url: string, opts?: RequestInit, timeout = 15000) =>
+      Promise.race([fetch(url, opts), new Promise<Response>((_, r) => setTimeout(() => r(new Response(null, { status: 408 })), timeout))]);
+
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         let cid = selectedCustomer?.id;
         if (!cid) {
-          const cr = await fetch('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
+          const cr = await fetchWithTimeout('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
           const ex = Array.isArray(cd) ? cd.find((c: any) => c.name === name) : null;
           if (ex) { cid = ex.id; setSelectedCustomer(ex); }
-          else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
+          else { const nr = await fetchWithTimeout('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
         }
-        const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
+        const or = await fetchWithTimeout('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
         const od = await or.json(); if (!or.ok) throw new Error(od.error || '保存失败');
         if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
         return true;
@@ -168,14 +171,14 @@ export default function Home() {
 
   const handleSave = async () => {
     setSaving(true); setSavedMsg('');
-    const ok = await doSave(false);
-    if (ok) newOrder();
-    setSaving(false);
+    try { const ok = await doSave(false); if (ok) newOrder(); }
+    catch {} finally { setSaving(false); }
   };
 
     // Save preview as image
   const handleSaveImage = async () => {
     setSavingImg(true);
+    try {
     setSavedMsg('正在保存...');
     const saved = await doSave(true);
     setSavedMsg(saved ? '已保存，正在导出图片...' : '保存失败，仍将导出图片');
@@ -192,6 +195,7 @@ export default function Home() {
   // PDF with Chinese support via html2canvas
   const handlePrint = async () => {
     setPrinting(true);
+    try {
     setSavedMsg('正在保存...');
     const saved = await doSave(true);
     setSavedMsg(saved ? '已保存，正在生成PDF...' : '保存失败，仍将生成PDF');
