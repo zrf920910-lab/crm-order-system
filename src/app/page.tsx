@@ -286,10 +286,13 @@ export default function Home() {
   };
 
   const exportSkus = () => {
-    const lines = sortByPinyin(skus).map(s => s.skuName + '\t' + (s.brand || '') + '\t' + s.costPrice + '\t' + (s.unit || '') + '\t' + (s.params || ''));
+    const source = selectedIds.size > 0 ? skus.filter(s => selectedIds.has(s.id)) : skus;
+    if (source.length === 0) return;
+    const sorted = sortByPinyin(source);
+    const lines = sorted.map(s => [s.skuName, s.brand || '', s.costPrice, s.unit || '', s.params || ''].join('\t'));
     const text = '商品名称\t品牌\t成本价\t单位\t参数\n' + lines.join('\n');
-    const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.txt'; a.click();
+    const blob = new Blob(['\uFEFF' + text], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.xls'; a.click();
   };
   const handleImport = async () => {
     const lines = importText.trim().split('\n').filter(l => l.trim());
@@ -543,7 +546,7 @@ export default function Home() {
             <button onClick={() => setShowAddSku(!showAddSku)} className="flex-1 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">+ 新增</button>
             <button onClick={() => selectedIds.size > 0 && setShowDeleteConfirm(true)} disabled={selectedIds.size === 0} className="py-1.5 px-2 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">删除({selectedIds.size})</button>
             <button onClick={() => { setShowImport(true); setImportText(""); setImportResult(""); }} className="py-1.5 px-2 bg-green-600 text-white text-xs rounded hover:bg-green-700">导入</button>
-            <button onClick={exportSkus} className="py-1.5 px-2 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">导出</button>
+            <button onClick={exportSkus} className="py-1.5 px-2 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">导出{selectedIds.size > 0 ? `(${selectedIds.size})` : ''}</button>
           </div>
           {showAddSku && (
             <div className="p-2 border-b bg-gray-50 space-y-1.5">
