@@ -40,6 +40,7 @@ export default function Home() {
   const [stampPos, setStampPos] = useState({ x: 0, y: 0 }); const [draggingStamp, setDraggingStamp] = useState(false);
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [savingImg, setSavingImg] = useState(false);
   const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
   const [preparerName, setPreparerName] = useState('');
   const stampRef = useRef<HTMLInputElement>(null);
@@ -144,6 +145,21 @@ export default function Home() {
       setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); newOrder();
     } catch (e: any) { setSavedMsg(e.message); setTimeout(() => setSavedMsg(''), 4000); }
     setSaving(false);
+  };
+
+    // Save preview as image
+  const handleSaveImage = async () => {
+    setSavingImg(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const el = previewRef.current; if (!el) { setSavingImg(false); return; }
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const link = document.createElement('a');
+      link.download = 'ORD-' + Date.now() + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (e) { console.error(e); }
+    setSavingImg(false);
   };
 
   // PDF with Chinese support via html2canvas
