@@ -148,16 +148,17 @@ export default function Home() {
     setSelectedIds(new Set()); loadRecycleBin(); loadAllSkus();
   };
 
-    const addNewRowItem = (sku?: Sku, customName?: string, customPrice?: string) => {
+    const addNewRowItem = (sku?: Sku, customName?: string, customPrice?: string, customQty?: string) => {
     const name = sku ? sku.skuName : (customName || newRowName.trim());
     if (!name) return;
     const brand = sku ? sku.brand : '';
     const unit = sku ? sku.unit : '';
+    const qty = customQty || '1';
     const price = customPrice || (sku ? (customerPrices[sku.skuName] || sku.costPrice) : '0');
     setLineItems(p => [...p, {
       skuName: name, brand, unit,
-      quantity: '1', unitPrice: parseFloat(price).toFixed(2),
-      total: parseFloat(price).toFixed(2),
+      quantity: qty, unitPrice: parseFloat(price).toFixed(2),
+      total: (parseFloat(price) * parseFloat(qty)).toFixed(2),
     }]);
     setNewRowName('');
     setShowNewRowDropdown(false);
@@ -383,7 +384,47 @@ export default function Home() {
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <table className="w-full text-xs"><thead><tr className="border-b-2 border-gray-300 bg-gray-50"><th className="text-left py-1.5 px-1 w-6">#</th><th className="text-left py-1.5 px-1">产品</th><th className="text-left py-1.5 px-1 w-16">品牌</th><th className="text-center py-1.5 px-1 w-12">单位</th><th className="text-right py-1.5 px-1 w-16">数量</th><th className="text-right py-1.5 px-1 w-18">单价</th><th className="text-right py-1.5 px-1 w-18">总价</th><th className="w-6"></th></tr></thead>
-            <tbody>{lineItems.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">从左侧产品列表点击添加</td></tr>
+            <tbody>
+              {/* New item input row */}
+              <tr className="border-b-2 border-blue-200 bg-blue-50/40">
+                <td className="py-1.5 px-1 text-center text-blue-400 text-lg">+</td>
+                <td className="py-1.5 px-1" colSpan={2}>
+                  <div ref={newRowRef} className="relative">
+                    <input type="text" placeholder="输入产品名称搜索或新增..." value={newRowName}
+                      onChange={e => setNewRowName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") addNewRowItem(); }}
+                      className="w-full px-2 py-1.5 border-2 border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
+                    {showNewRowDropdown && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                        {newRowSuggestions.map(s => (
+                          <button key={s.id} onClick={() => addNewRowItem(s)}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b flex justify-between items-center">
+                            <span>{s.skuName}{s.brand ? <span className="text-gray-400 ml-2 text-xs">({s.brand})</span> : ""}</span>
+                            <span className="text-blue-600 font-semibold text-sm">¥{parseFloat(customerPrices[s.skuName] || s.costPrice).toFixed(2)}{s.unit ? <span className="text-gray-400 font-normal ml-1 text-xs">/{s.unit}</span> : ""}</span>
+                          </button>
+                        ))}
+                        <button onClick={() => addNewRowItem(void 0, newRowName.trim(), void 0)}
+                          className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm text-green-600 font-medium border-t bg-green-50/30">
+                          + 新增产品 &quot;{newRowName.trim()}&quot;
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="py-1.5 px-1 text-center text-gray-400 text-xs">—</td>
+                <td className="py-1.5 px-1">
+                  <input type="number" min="0.01" step="0.01" defaultValue="1" id="newRowQty"
+                    onKeyDown={e => { if (e.key === "Enter") addNewRowItem(); }}
+                    className="w-full text-right px-2 py-1.5 border-2 border-blue-200 rounded text-sm bg-white" />
+                </td>
+                <td className="py-1.5 px-1">
+                  <input type="number" min="0" step="0.01" placeholder="单价" id="newRowPrice"
+                    onKeyDown={e => { if (e.key === "Enter") { const inp = document.getElementById("newRowPrice") as HTMLInputElement; const qi = document.getElementById("newRowQty") as HTMLInputElement; addNewRowItem(void 0, newRowName.trim(), inp?.value, qi?.value || "1"); } }}
+                    className="w-full text-right px-2 py-1.5 border-2 border-blue-200 rounded text-sm bg-white" />
+                </td>
+                <td className="py-1.5 px-1 text-right text-gray-300 text-sm">—</td>
+                <td className="py-1.5 px-1"></td>
+              </tr>{lineItems.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">从左侧产品列表点击添加</td></tr>
             : lineItems.map((item, idx) => (<tr key={idx} className="border-b hover:bg-blue-50/30"><td className="py-1 px-1 text-gray-400 text-center">{idx + 1}</td><td className="py-1 px-1 font-medium">{item.skuName}</td><td className="py-1 px-1 text-gray-500">{item.brand}</td><td className="py-1 px-1 text-gray-500 text-center">{item.unit}</td><td className="py-1 px-1"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td><td className="py-1 px-1 text-center"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">X</button></td></tr>))}</tbody></table>
           {lineItems.length > 0 && <div className="flex justify-end mt-2 pt-2 border-t border-gray-300"><span className="text-base font-bold">合计: ¥{totalAmount.toFixed(2)}</span></div>}
         </div>
