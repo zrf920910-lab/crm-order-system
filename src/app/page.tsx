@@ -47,6 +47,9 @@ export default function Home() {
   const [editCost, setEditCost] = useState('');
   const [editUnit, setEditUnit] = useState('');
   const [recycleSkus, setRecycleSkus] = useState<Sku[]>([]);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState("");
 
   // Order state
   const [customerName, setCustomerName] = useState('');
@@ -179,6 +182,35 @@ export default function Home() {
     const isPerm = showRecycleBin;
     await fetch('/api/skus?ids=' + [...selectedIds].join(',') + (isPerm ? '&permanent=1' : ''), { method: 'DELETE', headers: headers() });
     setSelectedIds(new Set()); setShowDeleteConfirm(false); loadAllSkus(); if (showRecycleBin) loadRecycleBin();
+  };
+
+  const handleImport = async () => {
+    const lines = importText.trim().split('\n').filter(l => l.trim());
+    if (lines.length < 2) { setImportResult('请粘贴表头和至少一行数据'); return; }
+    const header = lines[0].split('\t').map((h) => h.trim());
+    const nameIdx = header.findIndex((h) => h.includes('名称') || h.includes('产品') || h.includes('商品') || h === 'skuName');
+    const priceIdx = header.findIndex((h) => h.includes('价格') || h.includes('价') || h.includes('进货') || h === 'costPrice' || h === 'price');
+    const brandIdx = header.findIndex((h) => h.includes('品牌') || h === 'brand');
+    const unitIdx = header.findIndex((h) => h.includes('单位') || h === 'unit');
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split('\t');
+      const name = nameIdx >= 0 ? (cols[nameIdx] || '').trim() : '';
+      if (!name) continue;
+      rows.push({
+        skuName: name,
+        brand: brandIdx >= 0 ? (cols[brandIdx] || '').trim() : '',
+        costPrice: priceIdx >= 0 ? (cols[priceIdx] || '0').trim() : '0',
+        unit: unitIdx >= 0 ? (cols[unitIdx] || '').trim() : '',
+      });
+    }
+    if (rows.length === 0) { setImportResult('未找到有效数据'); return; }
+    try {
+      const r = await fetch('/api/skus/import', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
+      const d = await r.json();
+      if (r.ok) { setImportResult('导入 ' + d.imported + ' 条，跳过 ' + d.skipped + ' 条'); loadAllSkus(); setTimeout(() => setShowImport(false), 1500); }
+      else setImportResult(d.error || '导入失败');
+    } catch { setImportResult('网络错误'); }
   };
 
   const handleRestore = async () => {
@@ -376,6 +408,7 @@ export default function Home() {
           <div className="px-2 py-1.5 border-b flex gap-1">
             <button onClick={() => setShowAddSku(!showAddSku)} className="flex-1 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">+ 新增</button>
             <button onClick={() => selectedIds.size > 0 && setShowDeleteConfirm(true)} disabled={selectedIds.size === 0} className="py-1.5 px-2 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">删除({selectedIds.size})</button>
+            <button onClick={() => { setShowImport(true); setImportText(""); setImportResult(""); }} className="py-1.5 px-2 bg-green-600 text-white text-xs rounded hover:bg-green-700">导入</button>
           </div>
           {showAddSku && (
             <div className="p-2 border-b bg-gray-50 space-y-1.5">
@@ -565,6 +598,27 @@ export default function Home() {
       </div>
     
     </div>
+
+    {/* Import Modal */}
+    {showImport && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowImport(false)}>
+        <div className="bg-white rounded-xl shadow-2xl w-[520px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="text-lg font-bold">导入SKU数据</h3>
+            <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="text-xs text-gray-500">从Excel或Google表格复制数据，粘贴到下方（Tab分隔）：</div>
+            <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">第一行为表头（需包含名称和价格列），之后每行一条SKU</div>
+            <textarea value={importText} onChange={e => setImportText(e.target.value)}
+              placeholder={"商品名称\t进货价(元)\n超细悬挂干粉4kg\t100\n呼救器\t45"}
+              className="w-full h-48 px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            {importResult && <div className={"text-xs " + (importResult.includes("失败") || importResult.includes("错误") ? "text-red-600" : "text-green-600")}>{importResult}</div>}
+            <button onClick={handleImport} className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 text-sm">开始导入</button>
+          </div>
+        </div>
+      </div>
+    )}
     {/* History Modal */}
     {showHistory && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowHistory(false); setSelectedOrder(null); }}>
