@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Customer { id: number; name: string; phone: string; address: string; }
 interface Sku { id: number; skuName: string; brand: string; costPrice: string; unit: string; deleted: boolean; }
@@ -9,6 +10,23 @@ interface LineItem { skuName: string; brand: string; unit: string; quantity: str
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function Home() {
+  const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
+
+  // Auth helper
+  const token = useCallback(() => localStorage.getItem('token') || '', []);
+  const headers = useCallback(() => ({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() }), [token]);
+
+  // Auth check on mount
+  useEffect(() => {
+    const t = token();
+    if (!t) { router.push('/login'); return; }
+    fetch('/api/auth', { headers: { 'Authorization': 'Bearer ' + t } })
+      .then(r => r.json())
+      .then(d => { if (d.valid) { setAuthReady(true); } else { localStorage.removeItem('token'); router.push('/login'); } })
+      .catch(() => { router.push('/login'); });
+  }, [router]);
+
   // SKU state
   const [skus, setSkus] = useState<Sku[]>([]);
   const [allSkus, setAllSkus] = useState<Sku[]>([]);
@@ -63,17 +81,17 @@ export default function Home() {
 
     const loadOrders = useCallback(async () => {
     setOrderLoading(true);
-    try { const r = await fetch('/api/orders?limit=100'); const d = await r.json(); if (Array.isArray(d)) setOrders(d); } catch {}
+    try { const r = await fetch('/api/orders?limit=100', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setOrders(d); } catch {}
     setOrderLoading(false);
-  }, []);
+  }, [headers]);
 
   const loadAllCustomers = useCallback(async () => {
-    try { const r = await fetch('/api/customers?limit=100'); const d = await r.json(); if (Array.isArray(d)) setAllCustomers(d); } catch {}
-  }, []);
+    try { const r = await fetch('/api/customers?limit=100', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setAllCustomers(d); } catch {}
+  }, [headers]);
 
   const loadAllSkus = useCallback(async () => {
-    try { const r = await fetch('/api/skus?limit=500'); const d = await r.json(); if (Array.isArray(d)) setAllSkus(d); } catch {}
-  }, []);
+    try { const r = await fetch('/api/skus?limit=500', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setAllSkus(d); } catch {}
+  }, [headers]);
   useEffect(() => { loadAllSkus(); loadAllCustomers(); }, [loadAllSkus, loadAllCustomers]);
 
   // New row product search
@@ -95,26 +113,26 @@ export default function Home() {
   }, []);
 
   const loadRecycleBin = useCallback(async () => {
-    try { const r = await fetch('/api/skus?deleted=1&limit=500'); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
-  }, []);
+    try { const r = await fetch('/api/skus?deleted=1&limit=500', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
+  }, [headers]);
 
   useEffect(() => {
     if (showRecycleBin) { loadRecycleBin(); return; }
     setSkuLoading(true);
     const p = new URLSearchParams();
     if (searchText) p.set('q', searchText); else p.set('letter', filterLetter);
-    fetch('/api/skus?' + p).then(r => r.json()).then(d => { if (Array.isArray(d)) setSkus(d); }).catch(() => {}).finally(() => setSkuLoading(false));
+    fetch('/api/skus?' + p, { headers: headers() }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSkus(d); }).catch(() => {}).finally(() => setSkuLoading(false));
   }, [filterLetter, searchText, showRecycleBin, loadRecycleBin]);
 
   useEffect(() => {
     if (!selectedCustomer || allSkus.length === 0) { setCustomerPrices({}); return; }
-    fetch('/api/prices?customerId=' + selectedCustomer.id).then(r => r.json()).then(d => { if (d.prices) setCustomerPrices(d.prices); }).catch(() => {});
+    fetch('/api/prices?customerId=' + selectedCustomer.id, { headers: headers() }).then(r => r.json()).then(d => { if (d.prices) setCustomerPrices(d.prices); }).catch(() => {});
   }, [selectedCustomer, allSkus]);
 
   useEffect(() => {
     if (!customerName.trim() || (selectedCustomer && selectedCustomer.name === customerName)) { setSuggestions([]); setShowSuggestions(false); return; }
     const t = setTimeout(async () => {
-      try { const r = await fetch('/api/customers?q=' + encodeURIComponent(customerName)); const d = await r.json(); if (Array.isArray(d) && d.length > 0) { setSuggestions(d); setShowSuggestions(true); } } catch {}
+      try { const r = await fetch('/api/customers?q=' + encodeURIComponent(customerName), { headers: headers() }); const d = await r.json(); if (Array.isArray(d) && d.length > 0) { setSuggestions(d); setShowSuggestions(true); } } catch {}
     }, 300);
     return () => clearTimeout(t);
   }, [customerName, selectedCustomer]);
@@ -146,7 +164,7 @@ export default function Home() {
     const name = nsName.trim(); if (!name) { setSkuError('请输入产品名称'); return; }
     setSkuError('');
     try {
-      const r = await fetch('/api/skus', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skuName: name, brand: nsBrand, costPrice: nsCost || '0', unit: nsUnit }) });
+      const r = await fetch('/api/skus', { method: 'POST', headers: headers(), body: JSON.stringify({ skuName: name, brand: nsBrand, costPrice: nsCost || '0', unit: nsUnit }) });
       const d = await r.json();
       if (r.ok) { setNsName(''); setNsBrand(''); setNsCost(''); setNsUnit(''); setShowAddSku(false); setSearchText(name); setFilterLetter(''); loadAllSkus(); }
       else setSkuError(d.error || '保存失败');
@@ -159,13 +177,13 @@ export default function Home() {
   const handleDelete = async () => {
     if (selectedIds.size === 0) return;
     const isPerm = showRecycleBin;
-    await fetch('/api/skus?ids=' + [...selectedIds].join(',') + (isPerm ? '&permanent=1' : ''), { method: 'DELETE' });
+    await fetch('/api/skus?ids=' + [...selectedIds].join(',') + (isPerm ? '&permanent=1' : ''), { method: 'DELETE', headers: headers() });
     setSelectedIds(new Set()); setShowDeleteConfirm(false); loadAllSkus(); if (showRecycleBin) loadRecycleBin();
   };
 
   const handleRestore = async () => {
     if (selectedIds.size === 0) return;
-    await fetch('/api/skus?ids=' + [...selectedIds].join(',') + '&restore=1', { method: 'DELETE' });
+    await fetch('/api/skus?ids=' + [...selectedIds].join(',') + '&restore=1', { method: 'DELETE', headers: headers() });
     setSelectedIds(new Set()); loadRecycleBin(); loadAllSkus();
   };
 
@@ -189,13 +207,13 @@ export default function Home() {
       const existing = allSkus.find(s => s.skuName.toLowerCase() === customName.toLowerCase());
       if (!existing) {
         // Only create SKU if it doesn't exist - cost price set only first time
-        fetch('/api/skus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        fetch('/api/skus', { method: 'POST', headers: headers(),
           body: JSON.stringify({ skuName: customName, brand: '', costPrice: customPrice || '0', unit: '' }) })
           .then(() => loadAllSkus()).catch(() => {});
       }
       // Always update customer price for this customer
       if (selectedCustomer && customPrice) {
-        fetch('/api/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        fetch('/api/prices', { method: 'POST', headers: headers(),
           body: JSON.stringify({ customerId: selectedCustomer.id, skuName: customName, price: customPrice }) })
           .catch(() => {});
       }
@@ -224,12 +242,12 @@ export default function Home() {
       try {
         let cid = selectedCustomer?.id;
         if (!cid) {
-          const cr = await fetch('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
+          const cr = await fetch('/api/customers?q=' + encodeURIComponent(name), { headers: headers() }); const cd = await cr.json();
           const ex = Array.isArray(cd) ? cd.find((c: any) => c.name === name) : null;
           if (ex) { cid = ex.id; setSelectedCustomer(ex); }
-          else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
+          else { const nr = await fetch('/api/customers', { method: 'POST', headers: headers(), body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
         }
-        const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage: stampImage ? '[stamp]' : '', orderNumber: 'ORD-' + Date.now() }) });
+        const or = await fetch('/api/orders', { method: 'POST', headers: headers(), body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage: stampImage ? '[stamp]' : '', orderNumber: 'ORD-' + Date.now() }) });
         const od = or.headers.get('content-type')?.includes('json') ? await or.json() : { error: '服务器错误，请重试' };
         if (!or.ok) throw new Error(od.error || '保存失败');
         if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
@@ -314,7 +332,7 @@ export default function Home() {
   };
 
   const viewOrderDetail = async (orderId: number) => {
-    try { const r = await fetch('/api/orders/' + orderId); const d = await r.json(); setSelectedOrder(d); } catch {}
+    try { const r = await fetch('/api/orders/' + orderId, { headers: headers() }); const d = await r.json(); setSelectedOrder(d); } catch {}
   };
 
   const stampDragStart = (e: React.MouseEvent) => { e.preventDefault(); setDraggingStamp(true); };
@@ -322,6 +340,11 @@ export default function Home() {
   const stampDragEnd = () => { setDraggingStamp(false); };
 
   const totalAmount = lineItems.reduce((s, i) => s + parseFloat(i.total || '0'), 0);
+
+  // Show loading spinner while checking auth
+  if (!authReady) {
+    return <div className="flex h-screen items-center justify-center bg-gray-100"><div className="text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div><div className="text-gray-500 text-sm">验证登录状态...</div></div></div>;
+  }
 
   return (
     <>

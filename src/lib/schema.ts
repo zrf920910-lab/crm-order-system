@@ -1,7 +1,14 @@
-import { pgTable, serial, varchar, boolean, decimal, integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, decimal, integer, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  phone: varchar('phone', { length: 20 }).unique().notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 export const customers = pgTable('customers', {
   id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
   name: varchar('name', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 50 }).default(''),
   address: text('address').default(''),
@@ -12,6 +19,7 @@ export const customers = pgTable('customers', {
 
 export const skuPrices = pgTable('sku_prices', {
   id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
   skuName: varchar('sku_name', { length: 255 }).notNull(),
   brand: varchar('brand', { length: 100 }).default(''),
   costPrice: decimal('cost_price', { precision: 12, scale: 2 }).default('0'),
@@ -23,6 +31,7 @@ export const skuPrices = pgTable('sku_prices', {
 
 export const customerPrices = pgTable('customer_prices', {
   id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
   customerId: integer('customer_id').notNull().references(() => customers.id),
   skuName: varchar('sku_name', { length: 255 }).notNull(),
   price: decimal('price', { precision: 12, scale: 2 }).default('0'),
@@ -32,6 +41,7 @@ export const customerPrices = pgTable('customer_prices', {
 
 export const orders = pgTable('orders', {
   id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
   orderNumber: varchar('order_number', { length: 50 }).notNull(),
   customerId: integer('customer_id').notNull().references(() => customers.id),
   totalAmount: decimal('total_amount', { precision: 12, scale: 2 }).default('0'),

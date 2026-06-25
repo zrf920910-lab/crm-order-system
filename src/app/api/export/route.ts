@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, schema } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { verifyToken, getToken } from '@/lib/auth';
+
+async function getUid(req: NextRequest) { const t = getToken(req); if (!t) return null; return verifyToken(t); }
 
 export async function POST(req: NextRequest) {
+  const uid = await getUid(req); if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
     const { orderId } = body;
@@ -10,7 +14,7 @@ export async function POST(req: NextRequest) {
     const [order] = await db
       .select()
       .from(schema.orders)
-      .where(eq(schema.orders.id, orderId))
+      .where(and(eq(schema.orders.id, orderId), eq(schema.orders.userId, uid)))
       .limit(1);
 
     if (!order) {
