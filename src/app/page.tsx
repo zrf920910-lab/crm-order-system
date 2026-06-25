@@ -398,7 +398,7 @@ export default function Home() {
                   <div ref={newRowRef} className="relative">
                     <input type="text" placeholder="输入产品名称搜索或新增..." value={newRowName}
                       onChange={e => setNewRowName(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") addNewRowItem(); }}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) addNewRowItem(); }}
                       className="w-full px-2 py-1.5 border-2 border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
                     {showNewRowDropdown && (
                       <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-44 overflow-y-auto">
