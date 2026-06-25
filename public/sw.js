@@ -1,15 +1,7 @@
-const CACHE_NAME = 'order-mgmt-v1';
-const urlsToCache = [
-  '/',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-];
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `order-mgmt-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
-  );
   self.skipWaiting();
 });
 
@@ -25,19 +17,44 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip API calls - don't cache them
-  if (event.request.url.includes('/api/')) {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip API calls
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Network-first for HTML (navigation) requests
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
     return;
   }
+
+  // Cache-first for static assets (JS/CSS/images/fonts)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        if (response.ok && response.type === 'basic') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request).then((response) => {
+        if (response.ok) {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
         }
         return response;
       });
     })
   );
+});
+
+// Notify clients when a new version is available
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
 });
