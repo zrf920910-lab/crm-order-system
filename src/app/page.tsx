@@ -8,6 +8,7 @@ interface Sku { id: number; skuName: string; brand: string; costPrice: string; u
 interface LineItem { skuName: string; brand: string; unit: string; quantity: string; unitPrice: string; total: string; }
 
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const NUMBERS = '0-9';
 
 export default function Home() {
   const router = useRouter();
@@ -174,7 +175,7 @@ export default function Home() {
     if (showRecycleBin) { loadRecycleBin(); return; }
     setSkuLoading(true);
     const p = new URLSearchParams();
-    if (searchText) p.set('q', searchText); else p.set('letter', filterLetter);
+    if (searchText) p.set('q', searchText); else if (filterLetter) p.set('letter', filterLetter);
     fetch('/api/skus?' + p, { headers: headers() }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSkus(d); }).catch(() => {}).finally(() => setSkuLoading(false));
   }, [filterLetter, searchText, showRecycleBin, loadRecycleBin]);
 
@@ -276,7 +277,7 @@ export default function Home() {
     const brand = sku ? sku.brand : '';
     const unit = sku ? sku.unit : '';
     const qty = customQty || '1';
-    const price = customPrice || (sku ? (customerPrices[sku.skuName] || sku.costPrice) : '0');
+    const price = customPrice || (sku ? (customerPrices[sku.skuName] || '0') : '0');
     setLineItems(p => [...p, {
       skuName: name, brand, unit,
       quantity: qty, unitPrice: parseFloat(price).toFixed(2),
@@ -304,7 +305,7 @@ export default function Home() {
   };
 
   const addToOrder = (sku: Sku) => {
-    const price = customerPrices[sku.skuName] || sku.costPrice;
+    const price = customerPrices[sku.skuName] || '0';
     setLineItems(p => [...p, { skuName: sku.skuName, brand: sku.brand, unit: sku.unit, quantity: '1', unitPrice: parseFloat(price).toFixed(2), total: parseFloat(price).toFixed(2) }]);
   };
 
@@ -524,7 +525,7 @@ export default function Home() {
           </div>
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
-              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : (!filterLetter && l === '#' ? 'text-blue-600 font-bold' : 'text-gray-500'))}>{l}</button>))}
+              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
             </div>
           )}
         </div>
