@@ -476,11 +476,11 @@ export default function Home() {
                 <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '9px', color: '#999' }}>拖拽公章可调整位置</div>
               </div>}
             <div style={{ marginTop: '15px', fontSize: '10px', clear: 'both', display: 'flex' }}>
-              <div style={{ flex: 1, borderTop: '1px solid #999', paddingTop: '0px', marginRight: '5%' }}>
-                <span style={{ position: 'relative', top: '-8px', background: '#fff', paddingRight: '4px' }}>制单人: {preparerName || ''}</span>
+              <div style={{ flex: 1, paddingTop: '4px', marginRight: '5%' }}>
+                制单人: {preparerName || '________'}
               </div>
-              <div style={{ flex: 1, borderTop: '1px solid #999', paddingTop: '0px' }}>
-                <span style={{ position: 'relative', top: '-8px', background: '#fff', paddingRight: '4px' }}>签收人:</span>
+              <div style={{ flex: 1, borderBottom: '1px solid #999', paddingBottom: '2px' }}>
+                签收人:
               </div>
             </div>
           </div>
