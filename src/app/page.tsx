@@ -32,6 +32,7 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+    const openHistory = () => { setShowHistory(true); loadOrders(); };
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -43,11 +44,21 @@ export default function Home() {
   const [savingImg, setSavingImg] = useState(false);
   const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
   const [preparerName, setPreparerName] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-    const loadAllCustomers = useCallback(async () => {
+      const loadOrders = useCallback(async () => {
+    setOrderLoading(true);
+    try { const r = await fetch('/api/orders?limit=100'); const d = await r.json(); if (Array.isArray(d)) setOrders(d); } catch {}
+    setOrderLoading(false);
+  }, []);
+
+  const loadAllCustomers = useCallback(async () => {
     try { const r = await fetch('/api/customers?limit=100'); const d = await r.json(); if (Array.isArray(d)) setAllCustomers(d); } catch {}
   }, []);
 
@@ -196,7 +207,11 @@ export default function Home() {
     setPrinting(false);
   };
 
-    const stampDragStart = (e: React.MouseEvent) => { e.preventDefault(); setDraggingStamp(true); };
+      const viewOrderDetail = async (orderId: number) => {
+    try { const r = await fetch('/api/orders/' + orderId); const d = await r.json(); setSelectedOrder(d); } catch {}
+  };
+
+  const stampDragStart = (e: React.MouseEvent) => { e.preventDefault(); setDraggingStamp(true); };
   const stampDragMove = (e: React.MouseEvent) => { if (!draggingStamp) return; setStampPos(p => ({ x: p.x - e.movementX, y: p.y + e.movementY })); };
   const stampDragEnd = () => { setDraggingStamp(false); };
 
@@ -259,7 +274,11 @@ export default function Home() {
 
       {/* CENTER: Order Form */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="p-2.5 bg-white border-b flex items-center justify-between"><h2 className="text-base font-bold">开单</h2><button onClick={newOrder} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium">+ 新建订单</button></div>
+        <div className="p-2.5 bg-white border-b flex items-center justify-between"><div className="flex items-center gap-2">
+            <h2 className="text-base font-bold">开单</h2>
+            <button onClick={openHistory} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600">历史订单</button>
+          </div>
+          <button onClick={newOrder} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium">+ 新建订单</button></div>
         <div className="p-3 border-b bg-white space-y-2">
           <div ref={custRef} className="relative"><label className="text-xs text-gray-500 mb-0.5 block">客户名称</label>
             <div className="flex gap-1">
@@ -346,6 +365,57 @@ export default function Home() {
           </div>
         </div>
       </div>
+    </div>
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowHistory(false); setSelectedOrder(null); }}>
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-bold">{selectedOrder ? '订单详情' : '历史订单'}</h3>
+              <button onClick={() => { setShowHistory(false); setSelectedOrder(null); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {selectedOrder ? (
+                <div>
+                  <button onClick={() => setSelectedOrder(null)} className="text-sm text-blue-600 hover:underline mb-3 inline-block">&larr; 返回列表</button>
+                  <div className="bg-gray-50 p-3 rounded-lg mb-3 text-sm space-y-1">
+                    <div><strong>单号:</strong> {selectedOrder.orderNumber}</div>
+                    <div><strong>日期:</strong> {new Date(selectedOrder.createdAt).toLocaleString('zh-CN')}</div>
+                    <div><strong>客户:</strong> {selectedOrder.customer?.name || '--'}</div>
+                    <div><strong>电话:</strong> {selectedOrder.customer?.phone || '--'}</div>
+                    <div><strong>备注:</strong> {selectedOrder.notes || '--'}</div>
+                  </div>
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-gray-100 border-b"><th className="p-1.5 text-left">#</th><th className="p-1.5 text-left">产品</th><th className="p-1.5 text-left">品牌</th><th className="p-1.5 text-center">单位</th><th className="p-1.5 text-right">数量</th><th className="p-1.5 text-right">单价</th><th className="p-1.5 text-right">金额</th></tr></thead>
+                    <tbody>{selectedOrder.items?.map((item: any, i: number) => (
+                      <tr key={i} className="border-b"><td className="p-1.5">{i+1}</td><td className="p-1.5">{item.skuName}</td><td className="p-1.5">{item.brand}</td><td className="p-1.5 text-center">{item.unit}</td><td className="p-1.5 text-right">{item.quantity}</td><td className="p-1.5 text-right">¥{parseFloat(item.unitPrice).toFixed(2)}</td><td className="p-1.5 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td></tr>
+                    ))}</tbody>
+                  </table>
+                  <div className="text-right mt-3 text-base font-bold">合计: ¥{parseFloat(selectedOrder.totalAmount).toFixed(2)}</div>
+                </div>
+              ) : orderLoading ? (
+                <div className="text-center py-8 text-gray-400">加载中...</div>
+              ) : orders.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">暂无历史订单</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-gray-100 border-b"><th className="p-2 text-left">单号</th><th className="p-2 text-left">日期</th><th className="p-2 text-left">客户</th><th className="p-2 text-right">金额</th><th className="p-2 text-center">操作</th></tr></thead>
+                  <tbody>{orders.map((row: any) => (
+                    <tr key={row.order.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2 text-xs font-mono">{row.order.orderNumber}</td>
+                      <td className="p-2 text-xs">{new Date(row.order.createdAt).toLocaleDateString('zh-CN')}</td>
+                      <td className="p-2 text-xs">{row.customer?.name || '--'}</td>
+                      <td className="p-2 text-xs text-right font-medium">¥{parseFloat(row.order.totalAmount).toFixed(2)}</td>
+                      <td className="p-2 text-center"><button onClick={() => viewOrderDetail(row.order.id)} className="text-xs text-blue-600 hover:underline">查看</button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
