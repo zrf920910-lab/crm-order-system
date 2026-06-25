@@ -77,12 +77,14 @@ export default function Home() {
       setEditCust(null); setCustSaveMsg('修改成功'); loadCustList(); loadAllCustomers(); setTimeout(() => setCustSaveMsg(''), 2000);
     } catch { setCustSaveMsg('网络错误'); }
   };
-  const deleteCustomer = async (id: number) => {
-    if (!confirm('确定删除该客户？')) return;
+  const deleteCustomer = (c: Customer) => { setDelCustTarget(c); };
+  const confirmDeleteCust = async () => {
+    if (!delCustTarget) return;
     try {
-      await fetch('/api/customers/' + id, { method: 'DELETE', headers: headers() });
-      loadCustList(); loadAllCustomers();
+      const r = await fetch('/api/customers/' + delCustTarget.id, { method: 'DELETE', headers: headers() });
+      if (r.ok || r.status === 200) { loadCustList(); loadAllCustomers(); }
     } catch {}
+    setDelCustTarget(null);
   };
   const openHistory = () => { setShowHistory(true); loadOrders(); };
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -111,6 +113,7 @@ export default function Home() {
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustAddr, setNewCustAddr] = useState('');
   const [custSaveMsg, setCustSaveMsg] = useState('');
+  const [delCustTarget, setDelCustTarget] = useState<Customer | null>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -665,6 +668,20 @@ export default function Home() {
       </div>
     )}
 
+
+    {/* Delete Confirm Modal */}
+    {delCustTarget && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setDelCustTarget(null)}>
+        <div className="bg-white rounded-xl shadow-2xl p-6 w-[360px]" onClick={e => e.stopPropagation()}>
+          <h3 className="text-lg font-bold mb-2">确认删除</h3>
+          <p className="text-sm text-gray-600 mb-4">确定要删除客户「{delCustTarget.name}」吗？此操作不可撤销。</p>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setDelCustTarget(null)} className="px-4 py-2 text-sm border rounded hover:bg-gray-100">取消</button>
+            <button onClick={confirmDeleteCust} className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700">确认删除</button>
+          </div>
+        </div>
+      </div>
+    )}
     {/* Customer Management Modal */}
     {showCustMgmt && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustMgmt(false)}>
@@ -703,7 +720,7 @@ export default function Home() {
                       <td className="p-2 text-gray-500 truncate max-w-[200px]">{c.address}</td>
                       <td className="p-2 text-center">
                         <button onClick={() => setEditCust({...c})} className="text-xs text-blue-600 hover:underline mr-2">编辑</button>
-                        <button onClick={() => deleteCustomer(c.id)} className="text-xs text-red-500 hover:underline">删除</button>
+                        <button onClick={() => deleteCustomer(c)} className="text-xs text-red-500 hover:underline">删除</button>
                       </td>
                     </tr>
                   )
