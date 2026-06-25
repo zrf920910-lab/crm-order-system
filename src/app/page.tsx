@@ -333,7 +333,7 @@ export default function Home() {
         <div className="flex-1 overflow-y-auto p-3">
           <div ref={previewRef} className="bg-white p-4 shadow-md" style={{ fontFamily: 'sans-serif', fontSize: '10px' }}>
             <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: '16px' }}>
-              <span>{companyName}</span><span style={{ fontSize: '18px' }}>销 售 单</span>
+              <span style={{ fontSize: '18px' }}>{companyName}</span><span style={{ fontSize: '18px' }}> 销 售 单</span>
             </div>
             <div style={{ fontSize: '11px', marginBottom: '8px' }}><div>日期: {new Date().toLocaleDateString('zh-CN')}</div></div>
             <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>客户: {customerName || '--'}</div>
