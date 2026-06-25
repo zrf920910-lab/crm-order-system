@@ -32,6 +32,8 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [stampImage, setStampImage] = useState('');
@@ -42,10 +44,14 @@ export default function Home() {
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
+    const loadAllCustomers = useCallback(async () => {
+    try { const r = await fetch('/api/customers?limit=100'); const d = await r.json(); if (Array.isArray(d)) setAllCustomers(d); } catch {}
+  }, []);
+
   const loadAllSkus = useCallback(async () => {
     try { const r = await fetch('/api/skus?limit=500'); const d = await r.json(); if (Array.isArray(d)) setAllSkus(d); } catch {}
   }, []);
-  useEffect(() => { loadAllSkus(); }, [loadAllSkus]);
+  useEffect(() => { loadAllSkus(); loadAllCustomers(); }, [loadAllSkus, loadAllCustomers]);
 
   const loadRecycleBin = useCallback(async () => {
     try { const r = await fetch('/api/skus?deleted=1&limit=500'); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
@@ -73,7 +79,7 @@ export default function Home() {
   }, [customerName, selectedCustomer]);
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (custRef.current && !custRef.current.contains(e.target as Node)) setShowSuggestions(false); };
+    const h = (e: MouseEvent) => { if (custRef.current && !custRef.current.contains(e.target as Node)) { setShowSuggestions(false); setDropdownOpen(false); } };
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
   }, []);
 
@@ -227,8 +233,30 @@ export default function Home() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="p-2.5 bg-white border-b flex items-center justify-between"><h2 className="text-base font-bold">开单</h2><button onClick={newOrder} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium">+ 新建订单</button></div>
         <div className="p-3 border-b bg-white space-y-2">
-          <div ref={custRef} className="relative"><label className="text-xs text-gray-500 mb-0.5 block">客户名称</label><input type="text" placeholder="输入客户名称..." value={customerName} onChange={e => { setCustomerName(e.target.value); if (selectedCustomer && selectedCustomer.name !== e.target.value) setSelectedCustomer(null); }} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
-            {showSuggestions && suggestions.length > 0 && (<div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-36 overflow-y-auto">{suggestions.map(c => (<button key={c.id} onClick={() => selectCust(c)} className="w-full text-left px-2 py-1.5 hover:bg-blue-50 text-xs border-b">{c.name}{c.phone && <span className="text-gray-400 ml-1">{c.phone}</span>}</button>))}</div>)}
+          <div ref={custRef} className="relative"><label className="text-xs text-gray-500 mb-0.5 block">客户名称</label>
+            <div className="flex gap-1">
+              <input type="text" placeholder="输入或搜索客户..." value={customerName}
+                onChange={e => { setCustomerName(e.target.value); if (selectedCustomer && selectedCustomer.name !== e.target.value) setSelectedCustomer(null); }}
+                onFocus={() => { if (!customerName.trim()) { loadAllCustomers(); setDropdownOpen(true); } }}
+                className="flex-1 px-2 py-1.5 border rounded-l text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <button onClick={() => { loadAllCustomers(); setDropdownOpen(!dropdownOpen); }}
+                className="px-2 py-1.5 border border-l-0 rounded-r bg-gray-100 hover:bg-gray-200 text-gray-500 text-sm">
+                {dropdownOpen ? '▲' : '▼'}
+              </button>
+            </div>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                {suggestions.map(c => (<button key={c.id} onClick={() => { selectCust(c); setDropdownOpen(false); }} className="w-full text-left px-2 py-1.5 hover:bg-blue-50 text-xs border-b">{c.name}{c.phone && <span className="text-gray-400 ml-1">{c.phone}</span>}</button>))}
+              </div>
+            )}
+            {dropdownOpen && suggestions.length === 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                <div className="px-2 py-1 text-xs text-gray-400 bg-gray-50 border-b">全部客户 (点击选择)</div>
+                {allCustomers.length === 0 ? <div className="px-2 py-3 text-xs text-gray-400 text-center">暂无客户</div>
+                : allCustomers.map(c => (<button key={c.id} onClick={() => { selectCust(c); setDropdownOpen(false); }}
+                    className="w-full text-left px-2 py-1.5 hover:bg-blue-50 text-xs border-b">{c.name}{c.phone && <span className="text-gray-400 ml-1">{c.phone}</span>}</button>))}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-gray-500 mb-0.5 block">电话</label><input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div><div><label className="text-xs text-gray-500 mb-0.5 block">地址</label><input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div></div>
         </div>
