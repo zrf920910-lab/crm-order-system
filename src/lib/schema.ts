@@ -3,6 +3,7 @@ import { pgTable, serial, varchar, decimal, integer, text, timestamp, boolean } 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   phone: varchar('phone', { length: 20 }).unique().notNull(),
+  passwordHash: text('password_hash'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

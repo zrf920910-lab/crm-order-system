@@ -341,6 +341,14 @@ export default function Home() {
 
   const totalAmount = lineItems.reduce((s, i) => s + parseFloat(i.total || '0'), 0);
 
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('phone');
+    router.push('/login');
+  };
+
   // Show loading spinner while checking auth
   if (!authReady) {
     return <div className="flex h-screen items-center justify-center bg-gray-100"><div className="text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div><div className="text-gray-500 text-sm">验证登录状态...</div></div></div>;
@@ -348,7 +356,15 @@ export default function Home() {
 
   return (
     <>
-    <div className="flex h-screen bg-gray-100">
+          {/* Top Bar */}
+      <div className="fixed top-0 left-0 right-0 z-30 bg-blue-600 text-white px-4 py-1.5 flex items-center justify-between shadow-md">
+        <span className="text-sm font-bold">客户订单管理系统</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs opacity-80">{typeof window !== 'undefined' ? localStorage.getItem('phone') || '' : ''}</span>
+          <button onClick={handleLogout} className="text-xs bg-white/20 px-2 py-0.5 rounded hover:bg-white/30">退出</button>
+        </div>
+      </div>
+      <div className="flex h-screen bg-gray-100 pt-8">
       {/* LEFT: SKU Panel */}
       <div className="w-[280px] bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div className="p-2.5 bg-blue-600 text-white text-sm font-bold flex justify-between items-center">
@@ -548,6 +564,7 @@ export default function Home() {
         </div>
       </div>
     
+    </div>
     {/* History Modal */}
     {showHistory && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowHistory(false); setSelectedOrder(null); }}>
@@ -597,7 +614,6 @@ export default function Home() {
         </div>
       </div>
     )}
-    </div>
     </>
   );
 }
