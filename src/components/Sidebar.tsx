@@ -18,6 +18,7 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSku, setNewSku] = useState({ skuCode: '', skuName: '', costPrice: '', unit: '' });
+  const [addError, setAddError] = useState("");
   const [customerPrices, setCustomerPrices] = useState<Record<string, string>>({});
 
   const fetchAllSkus = useCallback(async () => {
@@ -80,6 +81,7 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
   };
 
   const handleAddSku = async () => {
+    setAddError("");
     if (!newSku.skuCode || !newSku.skuName) return;
     try {
       const res = await fetch('/api/skus', {
@@ -143,9 +145,12 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
                 className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" />
             </div>
             <div className="flex gap-2">
-              <button onClick={handleAddSku} className="flex-1 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">保存</button>
-              <button onClick={() => setShowAddForm(false)} className="flex-1 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">取消</button>
+              <button type="button" onClick={handleAddSku} className="flex-1 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">保存</button>
+              <button type="button" onClick={() => { setShowAddForm(false); setAddError(''); }} className="flex-1 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">取消</button>
             </div>
+            {addError && (
+              <div className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">{addError}</div>
+            )}
           </div>
         )}
 

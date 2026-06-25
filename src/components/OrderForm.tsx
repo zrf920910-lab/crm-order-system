@@ -17,11 +17,10 @@ interface Props {
   lineItems: LineItem[];
   onLineItemsChange: (items: LineItem[]) => void;
   onCustomerChange: (customer: Customer | null) => void;
-  onNewOrder: () => void;
+  resetSignal: number;
 }
 
-export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChange, onCustomerChange, onNewOrder }: Props) {
-  // Customer input - directly editable
+export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChange, onCustomerChange, resetSignal }: Props) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
@@ -32,29 +31,44 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
   const [orderNotes, setOrderNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
-  const [orderStarted, setOrderStarted] = useState(false);
   const stampInputRef = useRef<HTMLInputElement>(null);
   const customerInputRef = useRef<HTMLDivElement>(null);
+  const prevResetSignal = useRef(resetSignal);
 
-  // Sync customer fields when selectedCustomer changes
+  // Reset all local state when resetSignal changes
+  useEffect(() => {
+    if (resetSignal !== prevResetSignal.current) {
+      prevResetSignal.current = resetSignal;
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setStampImage('');
+      setOrderNotes('');
+      setSavedMessage('');
+    }
+  }, [resetSignal]);
+
+  // Sync customer fields when selectedCustomer changes from parent
   useEffect(() => {
     if (selectedCustomer) {
       setCustomerName(selectedCustomer.name);
       setCustomerPhone(selectedCustomer.phone || '');
       setCustomerAddress(selectedCustomer.address || '');
-      setOrderStarted(true);
     }
   }, [selectedCustomer]);
 
   // Customer name autocomplete
   useEffect(() => {
-    if (!customerName.trim() || customerName.length < 1) {
+    if (!customerName.trim()) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
-    // Don't show suggestions for already-selected customer
     if (selectedCustomer && selectedCustomer.name === customerName) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
     const timer = setTimeout(async () => {
@@ -65,11 +79,12 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
           setSuggestions(data);
           setShowSuggestions(true);
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* silent */ }
     }, 300);
     return () => clearTimeout(timer);
   }, [customerName, selectedCustomer]);
 
+  // Close suggestions on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (customerInputRef.current && !customerInputRef.current.contains(e.target as Node)) {
@@ -86,10 +101,6 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
     setCustomerAddress(c.address || '');
     onCustomerChange(c);
     setShowSuggestions(false);
-  };
-
-  const clearCustomerSelection = () => {
-    onCustomerChange(null);
   };
 
   const updateLineItem = (index: number, field: keyof LineItem, value: string) => {
@@ -122,39 +133,30 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
     if (!name || lineItems.length === 0) return;
 
     setSaving(true);
+    setSavedMessage('');
     try {
       let customerId = selectedCustomer?.id;
 
-      // Auto-create customer if not selected from existing
       if (!customerId) {
-        // Check if a customer with this name already exists
         const checkRes = await fetch(`/api/customers?q=${encodeURIComponent(name)}`);
         const checkData = await checkRes.json();
-        const existing = Array.isArray(checkData) ? checkData.find(
-          (c: Customer) => c.name.toLowerCase() === name.toLowerCase()
-        ) : null;
+        const existing = Array.isArray(checkData)
+          ? checkData.find((c: Customer) => c.name.toLowerCase() === name.toLowerCase())
+          : null;
 
         if (existing) {
           customerId = existing.id;
           onCustomerChange(existing);
         } else {
-          // Create new customer
           const createRes = await fetch('/api/customers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name,
-              phone: customerPhone,
-              address: customerAddress,
-            }),
+            body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }),
           });
           const newCust = await createRes.json();
-          if (createRes.ok) {
-            customerId = newCust.id;
-            onCustomerChange(newCust);
-          } else {
-            throw new Error('创建客户失败');
-          }
+          if (!createRes.ok) throw new Error(newCust.error || '创建客户失败');
+          customerId = newCust.id;
+          onCustomerChange(newCust);
         }
       }
 
@@ -178,40 +180,24 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
         }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setSavedMessage(`✓ 订单 ${orderNumber} 已保存`);
-        setTimeout(() => setSavedMessage(''), 3000);
-        // Reset everything
-        onLineItemsChange([]);
-        onCustomerChange(null);
-        setCustomerName('');
-        setCustomerPhone('');
-        setCustomerAddress('');
-        setOrderNotes('');
-        setStampImage('');
-        setOrderStarted(false);
-      } else {
-        setSavedMessage(`✗ 保存失败: ${data.error}`);
-        setTimeout(() => setSavedMessage(''), 4000);
-      }
+      if (!res.ok) throw new Error(data.error || '保存订单失败');
+
+      setSavedMessage(`✓ 订单 ${orderNumber} 已保存`);
+      setTimeout(() => setSavedMessage(''), 4000);
+
+      // Clear form
+      onLineItemsChange([]);
+      onCustomerChange(null);
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+      setOrderNotes('');
+      setStampImage('');
     } catch (e: any) {
       setSavedMessage(`✗ ${e.message || '保存失败'}`);
-      setTimeout(() => setSavedMessage(''), 4000);
+      setTimeout(() => setSavedMessage(''), 5000);
     }
     setSaving(false);
-  };
-
-  const handleStartNewOrder = () => {
-    onLineItemsChange([]);
-    onCustomerChange(null);
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerAddress('');
-    setOrderNotes('');
-    setStampImage('');
-    setSavedMessage('');
-    setOrderStarted(true);
-    onNewOrder();
   };
 
   const handlePrintPDF = async () => {
@@ -313,7 +299,7 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
             onChange={e => {
               setCustomerName(e.target.value);
               if (selectedCustomer && selectedCustomer.name !== e.target.value) {
-                clearCustomerSelection();
+                onCustomerChange(null);
               }
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -323,6 +309,7 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
               {suggestions.map(c => (
                 <button
                   key={c.id}
+                  type="button"
                   onClick={() => selectCustomerSuggestion(c)}
                   className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100"
                 >
@@ -336,23 +323,15 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">电话</label>
-            <input
-              type="text"
-              placeholder="客户电话"
-              value={customerPhone}
+            <input type="text" placeholder="客户电话" value={customerPhone}
               onChange={e => setCustomerPhone(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">地址</label>
-            <input
-              type="text"
-              placeholder="客户地址"
-              value={customerAddress}
+            <input type="text" placeholder="客户地址" value={customerAddress}
               onChange={e => setCustomerAddress(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
         </div>
       </div>
@@ -396,7 +375,8 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
                   </td>
                   <td className="py-1.5 px-2 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td>
                   <td className="py-1.5 px-2">
-                    <button onClick={() => removeLineItem(idx)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                    <button type="button" onClick={() => removeLineItem(idx)}
+                      className="text-red-400 hover:text-red-600 text-xs">✕</button>
                   </td>
                 </tr>
               ))
@@ -412,7 +392,7 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer - actions */}
       <div className="p-4 border-t border-gray-200 space-y-3">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
@@ -423,7 +403,7 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
           <div>
             <label className="block text-xs text-gray-500 mb-1">公章</label>
             <input ref={stampInputRef} type="file" accept="image/*" onChange={handleStampUpload} className="hidden" />
-            <button onClick={() => stampInputRef.current?.click()}
+            <button type="button" onClick={() => stampInputRef.current?.click()}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                 stampImage ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
               }`}>
@@ -432,17 +412,19 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
           </div>
         </div>
         <div className="flex gap-3">
-          <button onClick={handleSave} disabled={saving || lineItems.length === 0 || !customerName.trim()}
+          <button type="button" onClick={handleSave}
+            disabled={saving || lineItems.length === 0 || !customerName.trim()}
             className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
             {saving ? '保存中...' : '保存订单到云端'}
           </button>
-          <button onClick={handlePrintPDF} disabled={lineItems.length === 0}
+          <button type="button" onClick={handlePrintPDF}
+            disabled={lineItems.length === 0}
             className="flex-1 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
             输出PDF打印
           </button>
         </div>
         {savedMessage && (
-          <div className={`text-sm text-center py-1.5 rounded ${
+          <div className={`text-sm text-center py-1.5 rounded font-medium ${
             savedMessage.startsWith('✓') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
           }`}>{savedMessage}</div>
         )}
