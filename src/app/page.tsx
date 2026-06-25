@@ -204,17 +204,7 @@ export default function Home() {
     try { const r = await fetch('/api/skus?deleted=1&limit=500', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
   }, [headers]);
 
-  // Client-side pinyin filtering
-  const getFilteredSkus = useCallback(() => {
-    let result = allSkus;
-    if (searchText) {
-      const q = searchText.toLowerCase();
-      result = result.filter(s => s.skuName.toLowerCase().includes(q) || (s.brand && s.brand.toLowerCase().includes(q)));
-    } else if (filterLetter) {
-      result = result.filter(s => getPinyinInitial(s.skuName) === filterLetter);
-    }
-    return sortByPinyin(result);
-  }, [allSkus, searchText, filterLetter]);
+
 
   useEffect(() => {
     if (showRecycleBin) { loadRecycleBin(); return; }
@@ -598,10 +588,10 @@ export default function Home() {
           </div>
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
-              <button onClick={() => { setSearchText(''); setFilterLetter(''); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400')}>全部</button>
-              <button onClick={() => { setSearchText(''); scrollToTop(); }} className={"w-full text-center text-xs py-0.5 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400 hover:text-blue-600')}>全部</button>
-              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); scrollToLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
-            {[..."0123456789"].map(d => (<button key={d} onClick={() => { setSearchText(''); scrollToLetter(d); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === d ? 'text-blue-600 font-bold' : 'text-gray-500')}>{d}</button>))}
+              
+              <button onClick={() => { setSearchText(''); scrollToTop(); }} className={"w-full text-center text-xs py-0 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400 hover:text-blue-600')}>全部</button>
+              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); scrollToLetter(l); }} className={"w-full text-center text-xs py-0 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
+            {[..."0123456789"].map(d => (<button key={d} onClick={() => { setSearchText(''); scrollToLetter(d); }} className={"w-full text-center text-xs py-0 hover:text-blue-600 " + (filterLetter === d ? 'text-blue-600 font-bold' : 'text-gray-500')}>{d}</button>))}
             </div>
           )}
         </div>
