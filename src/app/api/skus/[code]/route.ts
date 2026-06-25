@@ -13,11 +13,12 @@ export async function PUT(
       .update(schema.skuPrices)
       .set({
         skuName: body.skuName,
+        brand: body.brand,
         costPrice: body.costPrice,
         unit: body.unit,
         updatedAt: new Date(),
       })
-      .where(eq(schema.skuPrices.skuCode, decodeURIComponent(code)))
+      .where(eq(schema.skuPrices.id, parseInt(code)))
       .returning();
     if (!sku) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(sku);
@@ -32,7 +33,7 @@ export async function DELETE(
 ) {
   try {
     const { code } = await params;
-    await db.delete(schema.skuPrices).where(eq(schema.skuPrices.skuCode, decodeURIComponent(code)));
+    await db.delete(schema.skuPrices).where(eq(schema.skuPrices.id, parseInt(code)));
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

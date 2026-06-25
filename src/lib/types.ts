@@ -10,8 +10,8 @@ export interface Customer {
 
 export interface SkuPrice {
   id: number;
-  skuCode: string;
   skuName: string;
+  brand: string;
   costPrice: string;
   unit: string;
   createdAt: string;
@@ -21,7 +21,7 @@ export interface SkuPrice {
 export interface CustomerPrice {
   id: number;
   customerId: number;
-  skuCode: string;
+  skuName: string;
   price: string;
   createdAt: string;
   updatedAt: string;
@@ -41,15 +41,11 @@ export interface Order {
 export interface OrderItem {
   id: number;
   orderId: number;
-  skuCode: string;
   skuName: string;
+  brand: string;
+  unit: string;
   quantity: string;
   unitPrice: string;
   total: string;
   createdAt: string;
-}
-
-export interface OrderWithItems extends Order {
-  items: OrderItem[];
-  customer?: Customer;
 }
