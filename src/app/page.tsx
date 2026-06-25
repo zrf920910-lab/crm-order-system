@@ -259,6 +259,18 @@ export default function Home() {
 
   const updateItem = (idx: number, field: keyof LineItem, val: string) => {
     setLineItems(p => { const u = [...p]; u[idx] = { ...u[idx], [field]: val }; if (field === 'quantity' || field === 'unitPrice') u[idx].total = ((parseFloat(u[idx].quantity) || 0) * (parseFloat(u[idx].unitPrice) || 0)).toFixed(2); return u; });
+    // Sync brand/unit changes back to SKU table
+    if (field === 'brand' || field === 'unit') {
+      const item = lineItems[idx];
+      const targetSku = allSkus.find(s => s.skuName === item.skuName);
+      if (targetSku) {
+        const body: any = { skuName: targetSku.skuName, brand: targetSku.brand, costPrice: targetSku.costPrice, unit: targetSku.unit };
+        if (field === 'brand') body.brand = val;
+        if (field === 'unit') body.unit = val;
+        fetch('/api/skus/' + targetSku.id, { method: 'PUT', headers: headers(), body: JSON.stringify(body) })
+          .then(() => loadAllSkus()).catch(() => {});
+      }
+    }
   };
   const removeItem = (idx: number) => setLineItems(p => p.filter((_, i) => i !== idx));
 
@@ -541,7 +553,7 @@ export default function Home() {
                 <td className="py-1.5 px-1 text-right text-gray-300 text-sm">—</td>
                 <td className="py-1.5 px-1"></td>
               </tr>{lineItems.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">从左侧产品列表点击添加</td></tr>
-            : lineItems.map((item, idx) => (<tr key={idx} className="border-b hover:bg-blue-50/30"><td className="py-1 px-1 text-gray-400 text-center">{idx + 1}</td><td className="py-1 px-1 font-medium">{item.skuName}</td><td className="py-1 px-1 text-gray-500">{item.brand}</td><td className="py-1 px-1 text-gray-500 text-center">{item.unit}</td><td className="py-1 px-1"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td><td className="py-1 px-1 text-center"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">X</button></td></tr>))}</tbody></table>
+            : lineItems.map((item, idx) => (<tr key={idx} className="border-b hover:bg-blue-50/30"><td className="py-1 px-1 text-gray-400 text-center">{idx + 1}</td><td className="py-1 px-1 font-medium">{item.skuName}</td><td className="py-1 px-1"><input type="text" value={item.brand} onChange={e => updateItem(idx, "brand", e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="text" value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="w-full text-center px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td><td className="py-1 px-1 text-center"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">X</button></td></tr>))}</tbody></table>
           {lineItems.length > 0 && <div className="flex justify-end mt-2 pt-2 border-t border-gray-300"><span className="text-base font-bold">合计: ¥{totalAmount.toFixed(2)}</span></div>}
         </div>
         <div className="p-3 border-t bg-white space-y-2">
