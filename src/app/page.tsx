@@ -436,7 +436,7 @@ export default function Home() {
                   <div ref={newRowRef} className="relative">
                     <input type="text" placeholder="输入产品名称搜索或新增..." value={newRowName}
                       onChange={e => setNewRowName(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) addNewRowItem(); }}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { const pi = document.getElementById("newRowPrice") as HTMLInputElement; const qi = document.getElementById("newRowQty") as HTMLInputElement; addNewRowItem(void 0, newRowName.trim(), pi?.value || void 0, qi?.value || "1"); } }}
                       className="w-full px-2 py-1.5 border-2 border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
                     {showNewRowDropdown && (
                       <div className="absolute z-20 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-44 overflow-y-auto">
@@ -447,7 +447,7 @@ export default function Home() {
                             <span className="text-blue-600 font-semibold text-sm">¥{parseFloat(customerPrices[s.skuName] || s.costPrice).toFixed(2)}{s.unit ? <span className="text-gray-400 font-normal ml-1 text-xs">/{s.unit}</span> : ""}</span>
                           </button>
                         ))}
-                        <button onClick={() => addNewRowItem(void 0, newRowName.trim(), void 0)}
+                        <button onClick={() => (() => { const pi = document.getElementById("newRowPrice") as HTMLInputElement; const qi = document.getElementById("newRowQty") as HTMLInputElement; addNewRowItem(void 0, newRowName.trim(), pi?.value || void 0, qi?.value || "1"); })()}
                           className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm text-green-600 font-medium border-t bg-green-50/30">
                           + 新增产品 &quot;{newRowName.trim()}&quot;
                         </button>
@@ -458,7 +458,7 @@ export default function Home() {
                 <td className="py-1.5 px-1 text-center text-gray-400 text-xs">—</td>
                 <td className="py-1.5 px-1">
                   <input type="number" min="0.01" step="0.01" defaultValue="1" id="newRowQty"
-                    onKeyDown={e => { if (e.key === "Enter") addNewRowItem(); }}
+                    onKeyDown={e => { if (e.key === "Enter") { const pi = document.getElementById("newRowPrice") as HTMLInputElement; addNewRowItem(void 0, newRowName.trim(), pi?.value || void 0, (e.target as HTMLInputElement).value || "1"); } }}
                     className="w-full text-right px-2 py-1.5 border-2 border-blue-200 rounded text-sm bg-white" />
                 </td>
                 <td className="py-1.5 px-1">
