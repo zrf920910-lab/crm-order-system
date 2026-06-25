@@ -58,6 +58,32 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const loadCustList = async () => {
+    try { const r = await fetch('/api/customers?limit=200', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setCustList(d); } catch {}
+  };
+  const openCustMgmt = () => { setShowCustMgmt(true); loadCustList(); setEditCust(null); setNewCustName(''); setNewCustPhone(''); setNewCustAddr(''); setCustSaveMsg(''); };
+  const addCustomer = async () => {
+    if (!newCustName.trim()) { setCustSaveMsg('请输入客户名称'); return; }
+    try {
+      const r = await fetch('/api/customers', { method: 'POST', headers: headers(), body: JSON.stringify({ name: newCustName.trim(), phone: newCustPhone, address: newCustAddr }) });
+      if (r.ok) { setNewCustName(''); setNewCustPhone(''); setNewCustAddr(''); setCustSaveMsg('添加成功'); loadCustList(); loadAllCustomers(); setTimeout(() => setCustSaveMsg(''), 2000); }
+      else { const d = await r.json(); setCustSaveMsg(d.error || '添加失败'); }
+    } catch { setCustSaveMsg('网络错误'); }
+  };
+  const updateCustomer = async () => {
+    if (!editCust || !editCust.name.trim()) return;
+    try {
+      await fetch('/api/customers/' + editCust.id, { method: 'PUT', headers: headers(), body: JSON.stringify({ name: editCust.name, phone: editCust.phone, address: editCust.address }) });
+      setEditCust(null); setCustSaveMsg('修改成功'); loadCustList(); loadAllCustomers(); setTimeout(() => setCustSaveMsg(''), 2000);
+    } catch { setCustSaveMsg('网络错误'); }
+  };
+  const deleteCustomer = async (id: number) => {
+    if (!confirm('确定删除该客户？')) return;
+    try {
+      await fetch('/api/customers/' + id, { method: 'DELETE', headers: headers() });
+      loadCustList(); loadAllCustomers();
+    } catch {}
+  };
   const openHistory = () => { setShowHistory(true); loadOrders(); };
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
@@ -78,6 +104,13 @@ export default function Home() {
   const [orders, setOrders] = useState<any[]>([]);
   const [orderLoading, setOrderLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showCustMgmt, setShowCustMgmt] = useState(false);
+  const [custList, setCustList] = useState<Customer[]>([]);
+  const [editCust, setEditCust] = useState<Customer | null>(null);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustAddr, setNewCustAddr] = useState('');
+  const [custSaveMsg, setCustSaveMsg] = useState('');
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -481,7 +514,7 @@ export default function Home() {
 
       {/* CENTER: Order Form */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="p-2.5 bg-white border-b flex items-center justify-between"><div className="flex items-center gap-2"><h2 className="text-base font-bold">开单</h2><button onClick={openHistory} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600">历史订单</button></div><button onClick={newOrder} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium">+ 新建订单</button></div>
+        <div className="p-2.5 bg-white border-b flex items-center justify-between"><div className="flex items-center gap-2"><h2 className="text-base font-bold">开单</h2><button onClick={openHistory} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600">历史订单</button><button onClick={openCustMgmt} className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600">客户管理</button></div><button onClick={newOrder} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium">+ 新建订单</button></div>
         <div className="p-3 border-b bg-white space-y-2">
           <div ref={custRef} className="relative"><label className="text-xs text-gray-500 mb-0.5 block">客户名称</label>
             <div className="flex gap-1">
@@ -627,6 +660,56 @@ export default function Home() {
               className="w-full h-48 px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
             {importResult && <div className={"text-xs " + (importResult.includes("失败") || importResult.includes("错误") ? "text-red-600" : "text-green-600")}>{importResult}</div>}
             <button onClick={handleImport} className="w-full py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 text-sm">开始导入</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Customer Management Modal */}
+    {showCustMgmt && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustMgmt(false)}>
+        <div className="bg-white rounded-xl shadow-2xl w-[650px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="text-lg font-bold">客户管理</h3>
+            <button onClick={() => setShowCustMgmt(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          </div>
+          <div className="p-4 border-b bg-gray-50 space-y-2">
+            <div className="text-xs text-gray-500 font-medium">新增客户</div>
+            <div className="flex gap-2">
+              <input type="text" placeholder="客户名称 *" value={newCustName} onChange={e => setNewCustName(e.target.value)} className="flex-1 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <input type="text" placeholder="电话" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} className="w-32 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <input type="text" placeholder="地址" value={newCustAddr} onChange={e => setNewCustAddr(e.target.value)} className="w-40 px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <button onClick={addCustomer} className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 shrink-0">添加</button>
+            </div>
+            {custSaveMsg && <div className={custSaveMsg.includes("成功") ? "text-green-600 text-xs" : "text-red-600 text-xs"}>{custSaveMsg}</div>}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {custList.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">暂无客户</div> :
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-100 border-b"><th className="p-2 text-left">客户名称</th><th className="p-2 text-left w-32">电话</th><th className="p-2 text-left w-48">地址</th><th className="p-2 text-center w-20">操作</th></tr></thead>
+              <tbody>
+                {custList.map(c => (
+                  editCust?.id === c.id ? (
+                    <tr key={c.id} className="border-b bg-blue-50">
+                      <td className="p-1"><input type="text" value={editCust.name} onChange={e => setEditCust({...editCust, name: e.target.value})} className="w-full px-1 py-0.5 border rounded text-sm" /></td>
+                      <td className="p-1"><input type="text" value={editCust.phone} onChange={e => setEditCust({...editCust, phone: e.target.value})} className="w-full px-1 py-0.5 border rounded text-sm" /></td>
+                      <td className="p-1"><input type="text" value={editCust.address} onChange={e => setEditCust({...editCust, address: e.target.value})} className="w-full px-1 py-0.5 border rounded text-sm" /></td>
+                      <td className="p-1 text-center"><button onClick={updateCustomer} className="text-xs text-green-600 hover:underline mr-2">保存</button><button onClick={() => setEditCust(null)} className="text-xs text-gray-400 hover:underline">取消</button></td>
+                    </tr>
+                  ) : (
+                    <tr key={c.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2">{c.name}</td>
+                      <td className="p-2 text-gray-500">{c.phone}</td>
+                      <td className="p-2 text-gray-500 truncate max-w-[200px]">{c.address}</td>
+                      <td className="p-2 text-center">
+                        <button onClick={() => setEditCust({...c})} className="text-xs text-blue-600 hover:underline mr-2">编辑</button>
+                        <button onClick={() => deleteCustomer(c.id)} className="text-xs text-red-500 hover:underline">删除</button>
+                      </td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>}
           </div>
         </div>
       </div>
