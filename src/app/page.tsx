@@ -229,8 +229,9 @@ export default function Home() {
           if (ex) { cid = ex.id; setSelectedCustomer(ex); }
           else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
         }
-        const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
-        const od = await or.json(); if (!or.ok) throw new Error(od.error || '保存失败');
+        const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage: stampImage ? '[stamp]' : '', orderNumber: 'ORD-' + Date.now() }) });
+        const od = or.headers.get('content-type')?.includes('json') ? await or.json() : { error: '服务器错误，请重试' };
+        if (!or.ok) throw new Error(od.error || '保存失败');
         if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
         return true;
       } catch (e: any) {
