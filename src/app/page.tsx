@@ -140,22 +140,30 @@ export default function Home() {
 
   const handleStamp = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setStampImage(r.result as string); r.readAsDataURL(f); };
 
-    const doSave = async (silent?: boolean) => {
+  const doSave = async (silent?: boolean): Promise<boolean> => {
     const name = customerName.trim();
     if (!name || lineItems.length === 0) return false;
-    try {
-      let cid = selectedCustomer?.id;
-      if (!cid) {
-        const cr = await fetch('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
-        const ex = Array.isArray(cd) ? cd.find((c: any) => c.name === name) : null;
-        if (ex) { cid = ex.id; setSelectedCustomer(ex); }
-        else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
+    let lastError = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        let cid = selectedCustomer?.id;
+        if (!cid) {
+          const cr = await fetch('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
+          const ex = Array.isArray(cd) ? cd.find((c: any) => c.name === name) : null;
+          if (ex) { cid = ex.id; setSelectedCustomer(ex); }
+          else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
+        }
+        const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
+        const od = await or.json(); if (!or.ok) throw new Error(od.error || '保存失败');
+        if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
+        return true;
+      } catch (e: any) {
+        lastError = e.message || '网络错误';
+        if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
       }
-      const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
-      const od = await or.json(); if (!or.ok) throw new Error(od.error || '保存失败');
-      if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
-      return true;
-    } catch (e: any) { if (!silent) { setSavedMsg(e.message); setTimeout(() => setSavedMsg(''), 4000); } return false; }
+    }
+    if (!silent) { setSavedMsg(lastError); setTimeout(() => setSavedMsg(''), 4000); }
+    return false;
   };
 
   const handleSave = async () => {
@@ -170,13 +178,14 @@ export default function Home() {
     setSavingImg(true);
     setSavedMsg('正在保存...');
     const saved = await doSave(true);
-    if (!saved) { setSavingImg(false); setSavedMsg('保存失败，请重试'); setTimeout(() => setSavedMsg(''), 3000); return; }
+    setSavedMsg(saved ? '已保存，正在导出图片...' : '保存失败，仍将导出图片');
     try {
       const html2canvas = (await import('html2canvas')).default;
       const el = previewRef.current; if (!el) { setSavingImg(false); return; }
       const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       const a = document.createElement('a'); a.download = 'ORD-' + Date.now() + '.png'; a.href = canvas.toDataURL('image/png'); a.click();
     } catch (e) { console.error(e); }
+    setSavedMsg('图片已导出'); setTimeout(() => setSavedMsg(''), 3000);
     setSavingImg(false);
   };
 
@@ -185,7 +194,7 @@ export default function Home() {
     setPrinting(true);
     setSavedMsg('正在保存...');
     const saved = await doSave(true);
-    if (!saved) { setPrinting(false); setSavedMsg('保存失败，请重试'); setTimeout(() => setSavedMsg(''), 3000); return; }
+    setSavedMsg(saved ? '已保存，正在生成PDF...' : '保存失败，仍将生成PDF');
     try {
       const html2canvas = (await import('html2canvas')).default;
       const el = previewRef.current; if (!el) { setPrinting(false); return; }
@@ -204,6 +213,7 @@ export default function Home() {
       }
       doc.save('ORD-' + Date.now() + '.pdf');
     } catch (e) { console.error(e); }
+    setSavedMsg('PDF已导出'); setTimeout(() => setSavedMsg(''), 3000);
     setPrinting(false);
   };
 
