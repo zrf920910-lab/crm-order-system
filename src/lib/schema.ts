@@ -47,7 +47,6 @@ export const orderItems = pgTable('order_items', {
   skuName: varchar('sku_name', { length: 255 }).notNull(),
   brand: varchar('brand', { length: 100 }).default(''),
   unit: varchar('unit', { length: 50 }).default(''),
-  deleted: boolean("deleted").default(false),
   quantity: decimal('quantity', { precision: 10, scale: 2 }).default('1'),
   unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).default('0'),
   total: decimal('total', { precision: 12, scale: 2 }).default('0'),
