@@ -27,6 +27,20 @@ function getPinyinInitial(name: string): string {
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const NUMBERS = '0-9';
 
+function sortByPinyin(skus: Sku[]): Sku[] {
+  return [...skus].sort((a, b) => {
+    const ia = getPinyinInitial(a.skuName);
+    const ib = getPinyinInitial(b.skuName);
+    if (ia === ib) return a.skuName.localeCompare(b.skuName, 'zh-CN');
+    if (ia === '0-9') return 1;
+    if (ib === '0-9') return -1;
+    if (ia === '#') return 1;
+    if (ib === '#') return -1;
+    return ia.localeCompare(ib);
+  });
+}
+
+
 export default function Home() {
   const router = useRouter();
   const [authReady, setAuthReady] = useState(false);
@@ -197,7 +211,7 @@ export default function Home() {
     } else if (filterLetter) {
       result = result.filter(s => getPinyinInitial(s.skuName) === filterLetter);
     }
-    return result;
+    return sortByPinyin(result);
   }, [allSkus, searchText, filterLetter]);
 
   useEffect(() => {
@@ -215,7 +229,7 @@ export default function Home() {
           setAllSkus(d);
           let filtered = d;
           if (filterLetter) filtered = d.filter((s: any) => getPinyinInitial(s.skuName) === filterLetter);
-          setSkus(filtered);
+          setSkus(sortByPinyin(filtered));
         }
       }).catch(() => {}).finally(() => setSkuLoading(false));
     }
@@ -567,6 +581,7 @@ export default function Home() {
           </div>
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
+              <button onClick={() => { setSearchText(''); setFilterLetter(''); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400')}>全部</button>
               {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
             <button onClick={() => { setSearchText(''); setFilterLetter('0-9'); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === '0-9' ? 'text-blue-600 font-bold' : 'text-gray-500')}>0-9</button>
             </div>
