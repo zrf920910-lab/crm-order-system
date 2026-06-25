@@ -162,11 +162,17 @@ export default function Home() {
     }]);
     setNewRowName('');
     setShowNewRowDropdown(false);
-    // If it's a new product, auto-save as SKU and customer price
+    // If it's a new product (not existing SKU), auto-save as SKU and customer price
     if (!sku && customName) {
-      fetch('/api/skus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skuName: customName, brand: '', costPrice: customPrice || '0', unit: '' }) })
-        .then(() => loadAllSkus()).catch(() => {});
+      // Check if SKU already exists (case-insensitive)
+      const existing = allSkus.find(s => s.skuName.toLowerCase() === customName.toLowerCase());
+      if (!existing) {
+        // Only create SKU if it doesn't exist - cost price set only first time
+        fetch('/api/skus', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skuName: customName, brand: '', costPrice: customPrice || '0', unit: '' }) })
+          .then(() => loadAllSkus()).catch(() => {});
+      }
+      // Always update customer price for this customer
       if (selectedCustomer && customPrice) {
         fetch('/api/prices', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ customerId: selectedCustomer.id, skuName: customName, price: customPrice }) })
