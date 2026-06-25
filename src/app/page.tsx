@@ -41,6 +41,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
   const [savingImg, setSavingImg] = useState(false);
+  const [savingImg, setSavingImg] = useState(false);
   const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
   const [preparerName, setPreparerName] = useState('');
   const stampRef = useRef<HTMLInputElement>(null);
@@ -162,6 +163,17 @@ export default function Home() {
     setSavingImg(false);
   };
 
+    const handleSaveImage = async () => {
+    setSavingImg(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const el = previewRef.current; if (!el) { setSavingImg(false); return; }
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const a = document.createElement('a'); a.download = 'ORD-' + Date.now() + '.png'; a.href = canvas.toDataURL('image/png'); a.click();
+    } catch (e) { console.error(e); }
+    setSavingImg(false);
+  };
+
   // PDF with Chinese support via html2canvas
   const handlePrint = async () => {
     setPrinting(true);
@@ -187,7 +199,7 @@ export default function Home() {
   };
 
     const stampDragStart = (e: React.MouseEvent) => { e.preventDefault(); setDraggingStamp(true); };
-  const stampDragMove = (e: React.MouseEvent) => { if (!draggingStamp) return; setStampPos(p => ({ x: p.x + e.movementX, y: p.y + e.movementY })); };
+  const stampDragMove = (e: React.MouseEvent) => { if (!draggingStamp) return; setStampPos(p => ({ x: p.x - e.movementX, y: p.y + e.movementY })); };
   const stampDragEnd = () => { setDraggingStamp(false); };
 
   const totalAmount = lineItems.reduce((s, i) => s + parseFloat(i.total || '0'), 0);
@@ -305,8 +317,9 @@ export default function Home() {
         <div className="p-2.5 bg-white border-b text-sm font-bold text-gray-700">打印预览</div>
         <div className="flex-1 overflow-y-auto p-3">
           <div ref={previewRef} className="bg-white p-4 shadow-md" style={{ fontFamily: 'sans-serif', fontSize: '10px' }}>
-            <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', marginBottom: '2px' }}>{companyName}</div>
-            <div style={{ textAlign: 'center', fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>销 售 单</div>
+            <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', marginBottom: '10px', display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: '16px' }}>
+              <span>{companyName}</span><span style={{ fontSize: '18px' }}>销 售 单</span>
+            </div>
             <div style={{ fontSize: '11px', marginBottom: '8px' }}><div>日期: {new Date().toLocaleDateString('zh-CN')}</div></div>
             <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>客户: {customerName || '--'}</div>
             <div style={{ fontSize: '10px', marginBottom: '12px', color: '#555' }}><div>电话: {customerPhone || '--'}</div><div>地址: {customerAddress || '--'}</div></div>
@@ -323,9 +336,13 @@ export default function Home() {
                   style={{ position: 'absolute', right: (80 + stampPos.x) + 'px', top: stampPos.y + 'px', width: '80px', height: '80px', opacity: 0.8, cursor: draggingStamp ? 'grabbing' : 'grab', userSelect: 'none' }} />
                 <div style={{ position: 'absolute', bottom: 0, right: 0, fontSize: '9px', color: '#999' }}>拖拽公章可调整位置</div>
               </div>}
-            <div style={{ marginTop: '15px', fontSize: '10px', clear: 'both' }}>
-              <div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px' }}>制单人:{preparerName ? ' ' + preparerName : ''}</div>
-              <div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px', marginLeft: '10%' }}>签收人:</div>
+            <div style={{ marginTop: '15px', fontSize: '10px', clear: 'both', display: 'flex' }}>
+              <div style={{ flex: 1, borderTop: '1px solid #999', paddingTop: '0px', marginRight: '5%' }}>
+                <span style={{ position: 'relative', top: '-8px', background: '#fff', paddingRight: '4px' }}>制单人: {preparerName || ''}</span>
+              </div>
+              <div style={{ flex: 1, borderTop: '1px solid #999', paddingTop: '0px' }}>
+                <span style={{ position: 'relative', top: '-8px', background: '#fff', paddingRight: '4px' }}>签收人:</span>
+              </div>
             </div>
           </div>
         </div>
