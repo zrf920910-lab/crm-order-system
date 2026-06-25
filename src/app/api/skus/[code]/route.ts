@@ -20,6 +20,7 @@ export async function PUT(
         brand: body.brand,
         costPrice: body.costPrice,
         unit: body.unit,
+        params: body.params || '',
         updatedAt: new Date(),
       })
       .where(and(eq(schema.skuPrices.id, parseInt(code)), eq(schema.skuPrices.userId, uid)))

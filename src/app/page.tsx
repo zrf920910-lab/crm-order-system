@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import pinyin from 'tiny-pinyin';
 
 interface Customer { id: number; name: string; phone: string; address: string; }
-interface Sku { id: number; skuName: string; brand: string; costPrice: string; unit: string; deleted: boolean; }
-interface LineItem { skuName: string; brand: string; unit: string; quantity: string; unitPrice: string; total: string; }
+interface Sku { id: number; skuName: string; brand: string; costPrice: string; unit: string; deleted: boolean; params: string; }
+interface LineItem { skuName: string; brand: string; unit: string; quantity: string; unitPrice: string; total: string; notes: string; }
 
 
 function getPinyinInitial(name: string): string {
@@ -79,6 +79,7 @@ export default function Home() {
   const [editBrand, setEditBrand] = useState('');
   const [editCost, setEditCost] = useState('');
   const [editUnit, setEditUnit] = useState('');
+  const [editParams, setEditParams] = useState('');
   const [recycleSkus, setRecycleSkus] = useState<Sku[]>([]);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -249,14 +250,14 @@ export default function Home() {
 
     const startEditSku = (sku: Sku) => {
     setEditingSku(sku.id); setEditName(sku.skuName); setEditBrand(sku.brand);
-    setEditCost(sku.costPrice); setEditUnit(sku.unit);
+    setEditCost(sku.costPrice); setEditUnit(sku.unit); setEditParams(sku.params || '');
   };
 
   const saveEditSku = async () => {
     if (!editName.trim()) return;
     try {
       await fetch('/api/skus/' + editingSku, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skuName: editName, brand: editBrand, costPrice: editCost, unit: editUnit }) });
+        body: JSON.stringify({ skuName: editName, brand: editBrand, costPrice: editCost, unit: editUnit, params: editParams }) });
       setEditingSku(null); loadAllSkus();
     } catch {}
   };
@@ -284,6 +285,12 @@ export default function Home() {
     setSelectedIds(new Set()); setShowDeleteConfirm(false); loadAllSkus(); if (showRecycleBin) loadRecycleBin();
   };
 
+  const exportSkus = () => {
+    const lines = sortByPinyin(skus).map(s => s.skuName + '\t' + (s.brand || '') + '\t' + s.costPrice + '\t' + (s.unit || '') + '\t' + (s.params || ''));
+    const text = '商品名称\t品牌\t成本价\t单位\t参数\n' + lines.join('\n');
+    const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.txt'; a.click();
+  };
   const handleImport = async () => {
     const lines = importText.trim().split('\n').filter(l => l.trim());
     if (lines.length < 2) { setImportResult('请粘贴表头和至少一行数据'); return; }
@@ -344,7 +351,7 @@ export default function Home() {
     setLineItems(p => [...p, {
       skuName: name, brand, unit,
       quantity: qty, unitPrice: parseFloat(price).toFixed(2),
-      total: (parseFloat(price) * parseFloat(qty)).toFixed(2),
+      total: (parseFloat(price) * parseFloat(qty)).toFixed(2), notes: '',
     }]);
     setNewRowName('');
     setShowNewRowDropdown(false);
@@ -369,7 +376,7 @@ export default function Home() {
 
   const addToOrder = (sku: Sku) => {
     const price = customerPrices[sku.skuName] || '0';
-    setLineItems(p => [...p, { skuName: sku.skuName, brand: sku.brand, unit: sku.unit, quantity: '1', unitPrice: parseFloat(price).toFixed(2), total: parseFloat(price).toFixed(2) }]);
+    setLineItems(p => [...p, { skuName: sku.skuName, brand: sku.brand, unit: sku.unit, quantity: '1', unitPrice: parseFloat(price).toFixed(2), total: parseFloat(price).toFixed(2), notes: '' }]);
   };
 
   const updateItem = (idx: number, field: keyof LineItem, val: string) => {
@@ -481,7 +488,7 @@ export default function Home() {
     if (orderData.items) {
       setLineItems(orderData.items.map((item: any) => ({
         skuName: item.skuName, brand: item.brand || '', unit: item.unit || '',
-        quantity: item.quantity, unitPrice: item.unitPrice, total: item.total,
+        quantity: item.quantity, unitPrice: item.unitPrice, total: item.total, notes: item.notes || '',
       })));
     }
     if (orderData.notes) setOrderNotes(orderData.notes);
@@ -536,6 +543,7 @@ export default function Home() {
             <button onClick={() => setShowAddSku(!showAddSku)} className="flex-1 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">+ 新增</button>
             <button onClick={() => selectedIds.size > 0 && setShowDeleteConfirm(true)} disabled={selectedIds.size === 0} className="py-1.5 px-2 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed">删除({selectedIds.size})</button>
             <button onClick={() => { setShowImport(true); setImportText(""); setImportResult(""); }} className="py-1.5 px-2 bg-green-600 text-white text-xs rounded hover:bg-green-700">导入</button>
+            <button onClick={exportSkus} className="py-1.5 px-2 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">导出</button>
           </div>
           {showAddSku && (
             <div className="p-2 border-b bg-gray-50 space-y-1.5">
@@ -571,6 +579,7 @@ export default function Home() {
                     <div className="flex gap-1">
                       <input type="number" step="0.01" value={editCost} onChange={e => setEditCost(e.target.value)} className="flex-1 px-1 py-0.5 border rounded text-xs" placeholder="成本价" />
                       <input type="text" value={editUnit} onChange={e => setEditUnit(e.target.value)} className="w-16 px-1 py-0.5 border rounded text-xs" placeholder="单位" />
+                    <input type="text" value={editParams} onChange={e => setEditParams(e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" placeholder="参数/规格" />
                     </div>
                     <div className="flex gap-1">
                       <button onClick={saveEditSku} className="flex-1 py-0.5 bg-green-600 text-white text-xs rounded">保存</button>
@@ -629,7 +638,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-2"><div><label className="text-xs text-gray-500 mb-0.5 block">电话</label><input type="text" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div><div><label className="text-xs text-gray-500 mb-0.5 block">地址</label><input type="text" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full px-2 py-1.5 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" /></div></div>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <table className="w-full text-xs"><thead><tr className="border-b-2 border-gray-300 bg-gray-50"><th className="text-left py-1.5 px-1 w-6">#</th><th className="text-left py-1.5 px-1">产品</th><th className="text-left py-1.5 px-1 w-16">品牌</th><th className="text-center py-1.5 px-1 w-12">单位</th><th className="text-right py-1.5 px-1 w-16">数量</th><th className="text-right py-1.5 px-1 w-18">单价</th><th className="text-right py-1.5 px-1 w-18">总价</th><th className="w-6"></th></tr></thead>
+          <table className="w-full text-xs"><thead><tr className="border-b-2 border-gray-300 bg-gray-50"><th className="text-left py-1.5 px-1 w-6">#</th><th className="text-left py-1.5 px-1">产品</th><th className="text-left py-1.5 px-1 w-16">品牌</th><th className="text-center py-1.5 px-1 w-12">单位</th><th className="text-right py-1.5 px-1 w-16">数量</th><th className="text-right py-1.5 px-1 w-18">单价</th><th className="text-right py-1.5 px-1 w-18">总价</th><th className="text-center py-1.5 px-1 w-16">备注</th><th className="w-6"></th></tr></thead>
             <tbody>
               {/* New item input row */}
               <tr className="border-b-2 border-blue-200 bg-blue-50/40">
@@ -670,8 +679,8 @@ export default function Home() {
                 </td>
                 <td className="py-1.5 px-1 text-right text-gray-300 text-sm">—</td>
                 <td className="py-1.5 px-1"></td>
-              </tr>{lineItems.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">从左侧产品列表点击添加</td></tr>
-            : lineItems.map((item, idx) => (<tr key={idx} className="border-b hover:bg-blue-50/30"><td className="py-1 px-1 text-gray-400 text-center">{idx + 1}</td><td className="py-1 px-1 font-medium">{item.skuName}</td><td className="py-1 px-1"><input type="text" value={item.brand} onChange={e => updateItem(idx, "brand", e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="text" value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="w-full text-center px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td><td className="py-1 px-1 text-center"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">X</button></td></tr>))}</tbody></table>
+              </tr>{lineItems.length === 0 ? <tr><td colSpan={9} className="text-center py-10 text-gray-400">从左侧产品列表点击添加</td></tr>
+            : lineItems.map((item, idx) => (<tr key={idx} className="border-b hover:bg-blue-50/30"><td className="py-1 px-1 text-gray-400 text-center">{idx + 1}</td><td className="py-1 px-1 font-medium">{item.skuName}</td><td className="py-1 px-1"><input type="text" value={item.brand} onChange={e => updateItem(idx, "brand", e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="text" value={item.unit} onChange={e => updateItem(idx, "unit", e.target.value)} className="w-full text-center px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0.01" step="0.01" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1"><input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="w-full text-right px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-right font-medium">¥{parseFloat(item.total).toFixed(2)}</td><td className="py-1 px-1"><input type="text" value={item.notes || ''} onChange={e => updateItem(idx, 'notes', e.target.value)} placeholder="备注" className="w-16 px-1 py-0.5 border rounded text-xs" /></td><td className="py-1 px-1 text-center"><button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">X</button></td></tr>))}</tbody></table>
           {lineItems.length > 0 && <div className="flex justify-end mt-2 pt-2 border-t border-gray-300"><span className="text-base font-bold">合计: ¥{totalAmount.toFixed(2)}</span></div>}
         </div>
         <div className="p-3 border-t bg-white space-y-2">
@@ -705,7 +714,7 @@ export default function Home() {
             <table style={{ width: '100%', fontSize: '9px', borderCollapse: 'collapse', marginBottom: '10px' }}>
               <thead><tr style={{ background: '#f0f0f0', borderBottom: '2px solid #ccc' }}><th style={{ padding: '3px 2px', textAlign: 'left' }}>#</th><th style={{ padding: '3px 2px', textAlign: 'left' }}>产品</th><th style={{ padding: '3px 2px', textAlign: 'left' }}>品牌</th><th style={{ padding: '3px 2px' }}>单位</th><th style={{ padding: '3px 2px', textAlign: 'right' }}>数量</th><th style={{ padding: '3px 2px', textAlign: 'right' }}>单价</th><th style={{ padding: '3px 2px', textAlign: 'right' }}>金额</th></tr></thead>
               <tbody>{lineItems.length === 0 ? <tr><td colSpan={7} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>暂无商品</td></tr>
-              : lineItems.map((item, idx) => (<tr key={idx} style={{ borderBottom: '1px solid #eee' }}><td style={{ padding: '2px' }}>{idx + 1}</td><td style={{ padding: '2px' }}>{item.skuName}</td><td style={{ padding: '2px' }}>{item.brand}</td><td style={{ padding: '2px', textAlign: 'center' }}>{item.unit}</td><td style={{ padding: '2px', textAlign: 'right' }}>{item.quantity}</td><td style={{ padding: '2px', textAlign: 'right' }}>¥{parseFloat(item.unitPrice).toFixed(2)}</td><td style={{ padding: '2px', textAlign: 'right', fontWeight: 'bold' }}>¥{parseFloat(item.total).toFixed(2)}</td></tr>))}</tbody>
+              : lineItems.map((item, idx) => (<tr key={idx} style={{ borderBottom: '1px solid #eee' }}><td style={{ padding: '2px' }}>{idx + 1}</td><td style={{ padding: '2px' }}>{item.skuName}</td><td style={{ padding: '2px' }}>{item.brand}</td><td style={{ padding: '2px', textAlign: 'center' }}>{item.unit}</td><td style={{ padding: '2px', textAlign: 'right' }}>{item.quantity}</td><td style={{ padding: '2px', textAlign: 'right' }}>¥{parseFloat(item.unitPrice).toFixed(2)}</td><td style={{ padding: '2px', textAlign: 'right', fontWeight: 'bold' }}>¥{parseFloat(item.total).toFixed(2)}</td><td style={{ padding: '2px', fontSize: '8px', color: '#888' }}>{item.notes || ''}</td></tr>))}</tbody>
             </table>
             {lineItems.length > 0 && (<><div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', marginBottom: '6px' }}>合计: ¥{totalAmount.toFixed(2)}</div><div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>大写: {numCN(totalAmount)}</div></>)}
             {orderNotes && <div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>备注: {orderNotes}</div>}

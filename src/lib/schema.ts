@@ -27,6 +27,7 @@ export const skuPrices = pgTable('sku_prices', {
   costPrice: decimal('cost_price', { precision: 12, scale: 2 }).default('0'),
   unit: varchar('unit', { length: 50 }).default(''),
   deleted: boolean("deleted").default(false),
+  params: text('params').default(''),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -62,5 +63,6 @@ export const orderItems = pgTable('order_items', {
   quantity: decimal('quantity', { precision: 10, scale: 2 }).default('1'),
   unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).default('0'),
   total: decimal('total', { precision: 12, scale: 2 }).default('0'),
+  notes: text('notes').default(''),
   createdAt: timestamp('created_at').defaultNow(),
 });

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     await db.insert(schema.orderItems).values(items.map((i: any) => ({
       orderId: order.id, skuName: i.skuName, brand: i.brand || '', unit: i.unit || '',
       quantity: i.quantity.toString(), unitPrice: i.unitPrice.toString(),
-      total: (parseFloat(i.unitPrice) * parseFloat(i.quantity)).toFixed(2),
+      total: (parseFloat(i.unitPrice) * parseFloat(i.quantity)).toFixed(2), notes: i.notes || '',
     })));
     const eps = await db.select().from(schema.customerPrices).where(and(eq(schema.customerPrices.customerId, customerId), eq(schema.customerPrices.userId, uid)));
     for (const item of items) {
