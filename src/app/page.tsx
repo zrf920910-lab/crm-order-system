@@ -23,6 +23,11 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [editingSku, setEditingSku] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editBrand, setEditBrand] = useState('');
+  const [editCost, setEditCost] = useState('');
+  const [editUnit, setEditUnit] = useState('');
   const [recycleSkus, setRecycleSkus] = useState<Sku[]>([]);
 
   // Order state
@@ -120,6 +125,22 @@ export default function Home() {
   }, []);
 
   const selectCust = (c: Customer) => { setCustomerName(c.name); setCustomerPhone(c.phone || ''); setCustomerAddress(c.address || ''); setSelectedCustomer(c); setShowSuggestions(false); };
+
+    const startEditSku = (sku: Sku) => {
+    setEditingSku(sku.id); setEditName(sku.skuName); setEditBrand(sku.brand);
+    setEditCost(sku.costPrice); setEditUnit(sku.unit);
+  };
+
+  const saveEditSku = async () => {
+    if (!editName.trim()) return;
+    try {
+      await fetch('/api/skus/' + editingSku, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skuName: editName, brand: editBrand, costPrice: editCost, unit: editUnit }) });
+      setEditingSku(null); loadAllSkus();
+    } catch {}
+  };
+
+  const cancelEditSku = () => { setEditingSku(null); };
 
   const handleAddSku = async () => {
     const name = nsName.trim(); if (!name) { setSkuError('请输入产品名称'); return; }
@@ -343,9 +364,25 @@ export default function Home() {
             : skus.map(s => (
               <div key={s.id} className="flex items-center hover:bg-blue-50 border-b group">
                 <input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelect(s.id)} className="ml-2 shrink-0" />
-                <button onClick={() => addToOrder(s)} className="flex-1 text-left px-2 py-2 min-w-0">
-                  <div className="flex justify-between items-start"><div className="min-w-0"><div className="text-xs font-medium truncate">{s.skuName}</div>{s.brand && <div className="text-xs text-gray-400">{s.brand}</div>}</div><div className="text-right shrink-0 ml-2">{customerPrices[s.skuName] ? <div className="text-xs font-semibold text-blue-600">¥{parseFloat(customerPrices[s.skuName]).toFixed(2)}</div> : <div className="text-xs text-gray-400">¥{parseFloat(s.costPrice).toFixed(2)}</div>}{s.unit && <div className="text-xs text-gray-400">{s.unit}</div>}</div></div>
-                </button>
+                {editingSku === s.id ? (
+                  <div className="flex-1 px-2 py-1.5 space-y-1">
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" placeholder="名称" />
+                    <input type="text" value={editBrand} onChange={e => setEditBrand(e.target.value)} className="w-full px-1 py-0.5 border rounded text-xs" placeholder="品牌" />
+                    <div className="flex gap-1">
+                      <input type="number" step="0.01" value={editCost} onChange={e => setEditCost(e.target.value)} className="flex-1 px-1 py-0.5 border rounded text-xs" placeholder="成本价" />
+                      <input type="text" value={editUnit} onChange={e => setEditUnit(e.target.value)} className="w-16 px-1 py-0.5 border rounded text-xs" placeholder="单位" />
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={saveEditSku} className="flex-1 py-0.5 bg-green-600 text-white text-xs rounded">保存</button>
+                      <button onClick={cancelEditSku} className="flex-1 py-0.5 bg-gray-400 text-white text-xs rounded">取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => addToOrder(s)} className="flex-1 text-left px-2 py-2 min-w-0">
+                    <div className="flex justify-between items-start"><div className="min-w-0"><div className="text-xs font-medium truncate">{s.skuName}</div>{s.brand && <div className="text-xs text-gray-400">{s.brand}</div>}</div><div className="text-right shrink-0 ml-2">{customerPrices[s.skuName] ? <div className="text-xs font-semibold text-blue-600">¥{parseFloat(customerPrices[s.skuName]).toFixed(2)}</div> : <div className="text-xs text-gray-400">¥{parseFloat(s.costPrice).toFixed(2)}</div>}{s.unit && <div className="text-xs text-gray-400">{s.unit}</div>}</div></div>
+                  </button>
+                )}
+                <button onClick={(e) => { e.stopPropagation(); startEditSku(s); }} className="shrink-0 px-1 py-2 text-gray-300 hover:text-blue-500 text-xs" title="编辑">✎</button>
               </div>
             ))}
           </div>
