@@ -289,10 +289,12 @@ export default function Home() {
     const source = selectedIds.size > 0 ? skus.filter(s => selectedIds.has(s.id)) : skus;
     if (source.length === 0) return;
     const sorted = sortByPinyin(source);
-    const lines = sorted.map(s => [s.skuName, s.brand || '', s.costPrice, s.unit || '', s.params || ''].join('\t'));
-    const text = '商品名称\t品牌\t成本价\t单位\t参数\n' + lines.join('\n');
-    const blob = new Blob(['\uFEFF' + text], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.xls'; a.click();
+    const csvEscape = (v: string) => { v = String(v); return v.includes(',') || v.includes('"') ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const header = '商品名称,品牌,成本价,单位,参数';
+    const lines = sorted.map(s => csvEscape(s.skuName) + ',' + csvEscape(s.brand || '') + ',' + csvEscape(s.costPrice) + ',' + csvEscape(s.unit || '') + ',' + csvEscape(s.params || ''));
+    const text = '\uFEFF' + header + '\n' + lines.join('\n');
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.csv'; a.click();
   };
   const handleImport = async () => {
     const lines = importText.trim().split('\n').filter(l => l.trim());
