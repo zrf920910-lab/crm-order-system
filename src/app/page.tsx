@@ -393,7 +393,7 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto p-4">
             {selectedOrder ? (
               <div>
-                <button onClick={() => setSelectedOrder(null)} className="text-sm text-blue-600 hover:underline mb-3 inline-block">&larr; 返回列表</button>
+                <div className="flex gap-3 mb-3"><button onClick={() => setSelectedOrder(null)} className="text-sm text-blue-600 hover:underline">&larr; 返回列表</button><button onClick={() => reopenOrder(selectedOrder)} className="text-sm text-green-600 hover:underline">重新开单</button></div>
                 <div className="bg-gray-50 p-3 rounded-lg mb-3 text-sm space-y-1">
                   <div><strong>单号:</strong> {selectedOrder.orderNumber}</div>
                   <div><strong>日期:</strong> {new Date(selectedOrder.createdAt).toLocaleString('zh-CN')}</div>
