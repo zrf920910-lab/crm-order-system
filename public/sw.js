@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `order-mgmt-${CACHE_VERSION}`;
 
 self.addEventListener('install', (event) => {
@@ -23,32 +23,15 @@ self.addEventListener('fetch', (event) => {
   // Skip API calls
   if (url.pathname.startsWith('/api/')) return;
 
-  // Network-first for HTML (navigation) requests
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets (JS/CSS/images/fonts)
+  // Network-first for navigation and all HTML/JS/CSS
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok) {
-          const cloned = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-        }
+    fetch(request)
+      .then((response) => {
+        const cloned = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
 

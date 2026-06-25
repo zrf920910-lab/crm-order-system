@@ -7,16 +7,15 @@ export default function ServiceWorkerRegister() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      let registration: ServiceWorkerRegistration;
-
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
-        registration = reg;
-
-        // Check for updates
+      // Unregister all old service workers, then register fresh
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        return Promise.all(regs.map(r => r.unregister()));
+      }).then(() => {
+        return navigator.serviceWorker.register('/sw.js');
+      }).then((reg) => {
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           if (!newWorker) return;
-
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
               setUpdateAvailable(true);
@@ -25,7 +24,6 @@ export default function ServiceWorkerRegister() {
         });
       }).catch(console.error);
 
-      // Also check on page load if controller changed
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) {
