@@ -526,6 +526,7 @@ export default function Home() {
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
               {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
+            <button onClick={() => { setSearchText(''); setFilterLetter('0-9'); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === '0-9' ? 'text-blue-600 font-bold' : 'text-gray-500')}>0-9</button>
             </div>
           )}
         </div>
