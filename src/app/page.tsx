@@ -2,10 +2,27 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import pinyin from 'tiny-pinyin';
 
 interface Customer { id: number; name: string; phone: string; address: string; }
 interface Sku { id: number; skuName: string; brand: string; costPrice: string; unit: string; deleted: boolean; }
 interface LineItem { skuName: string; brand: string; unit: string; quantity: string; unitPrice: string; total: string; }
+
+
+function getPinyinInitial(name: string): string {
+  if (!name) return '#';
+  const ch = name.charAt(0);
+  // If starts with A-Z or a-z, return uppercase
+  if (/^[A-Za-z]/.test(ch)) return ch.toUpperCase();
+  // If starts with digit, return '0-9'
+  if (/^[0-9]/.test(ch)) return '0-9';
+  // Try pinyin conversion for Chinese
+  try {
+    const py = pinyin.convertToPinyin(ch, '', true);
+    if (py && py.length > 0 && /^[A-Za-z]/.test(py)) return py.charAt(0).toUpperCase();
+  } catch {}
+  return '#';
+}
 
 const ALPHABET = '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const NUMBERS = '0-9';
@@ -171,13 +188,38 @@ export default function Home() {
     try { const r = await fetch('/api/skus?deleted=1&limit=500', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setRecycleSkus(d); } catch {}
   }, [headers]);
 
+  // Client-side pinyin filtering
+  const getFilteredSkus = useCallback(() => {
+    let result = allSkus;
+    if (searchText) {
+      const q = searchText.toLowerCase();
+      result = result.filter(s => s.skuName.toLowerCase().includes(q) || (s.brand && s.brand.toLowerCase().includes(q)));
+    } else if (filterLetter) {
+      result = result.filter(s => getPinyinInitial(s.skuName) === filterLetter);
+    }
+    return result;
+  }, [allSkus, searchText, filterLetter]);
+
   useEffect(() => {
     if (showRecycleBin) { loadRecycleBin(); return; }
-    setSkuLoading(true);
-    const p = new URLSearchParams();
-    if (searchText) p.set('q', searchText); else if (filterLetter) p.set('letter', filterLetter);
-    fetch('/api/skus?' + p, { headers: headers() }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSkus(d); }).catch(() => {}).finally(() => setSkuLoading(false));
-  }, [filterLetter, searchText, showRecycleBin, loadRecycleBin]);
+    // Always load all SKUs from API (text search still uses API)
+    if (searchText && searchText.length > 0) {
+      setSkuLoading(true);
+      const p = new URLSearchParams(); p.set('q', searchText);
+      fetch('/api/skus?' + p, { headers: headers() }).then(r => r.json()).then(d => { if (Array.isArray(d)) setSkus(d); }).catch(() => {}).finally(() => setSkuLoading(false));
+    } else {
+      setSkuLoading(true);
+      // Load all (no filter) then apply client-side pinyin filter
+      fetch('/api/skus?limit=500', { headers: headers() }).then(r => r.json()).then(d => {
+        if (Array.isArray(d)) {
+          setAllSkus(d);
+          let filtered = d;
+          if (filterLetter) filtered = d.filter((s: any) => getPinyinInitial(s.skuName) === filterLetter);
+          setSkus(filtered);
+        }
+      }).catch(() => {}).finally(() => setSkuLoading(false));
+    }
+  }, [filterLetter, searchText, showRecycleBin, loadRecycleBin, headers]);
 
   useEffect(() => {
     if (!selectedCustomer || allSkus.length === 0) { setCustomerPrices({}); return; }
