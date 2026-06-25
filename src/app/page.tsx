@@ -14,8 +14,8 @@ function getPinyinInitial(name: string): string {
   const ch = name.charAt(0);
   // If starts with A-Z or a-z, return uppercase
   if (/^[A-Za-z]/.test(ch)) return ch.toUpperCase();
-  // If starts with digit, return '0-9'
-  if (/^[0-9]/.test(ch)) return '0-9';
+  // If starts with digit, return the digit itself
+  if (/^[0-9]/.test(ch)) return ch;
   // Try pinyin conversion for Chinese
   try {
     const py = pinyin.convertToPinyin(ch, '', true);
@@ -32,8 +32,9 @@ function sortByPinyin(skus: Sku[]): Sku[] {
     const ia = getPinyinInitial(a.skuName);
     const ib = getPinyinInitial(b.skuName);
     if (ia === ib) return a.skuName.localeCompare(b.skuName, 'zh-CN');
-    if (ia === '0-9') return 1;
-    if (ib === '0-9') return -1;
+    if (/^[0-9]$/.test(ia) && /^[A-Z]$/.test(ib)) return 1;
+    if (/^[A-Z]$/.test(ia) && /^[0-9]$/.test(ib)) return -1;
+    if (/^[0-9]$/.test(ia) && /^[0-9]$/.test(ib)) return ia.localeCompare(ib);
     if (ia === '#') return 1;
     if (ib === '#') return -1;
     return ia.localeCompare(ib);
@@ -600,7 +601,7 @@ export default function Home() {
               <button onClick={() => { setSearchText(''); setFilterLetter(''); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400')}>全部</button>
               <button onClick={() => { setSearchText(''); scrollToTop(); }} className={"w-full text-center text-xs py-0.5 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400 hover:text-blue-600')}>全部</button>
               {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); scrollToLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
-            <button onClick={() => { setSearchText(''); scrollToLetter('0-9'); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === '0-9' ? 'text-blue-600 font-bold' : 'text-gray-500')}>0-9</button>
+            {[..."0123456789"].map(d => (<button key={d} onClick={() => { setSearchText(''); scrollToLetter(d); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === d ? 'text-blue-600 font-bold' : 'text-gray-500')}>{d}</button>))}
             </div>
           )}
         </div>
