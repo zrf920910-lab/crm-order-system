@@ -3,7 +3,6 @@ import { db, schema } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { signToken, verifyToken, getToken, hashUserPassword, verifyPassword } from '@/lib/auth';
 
-// POST: register or login
 export async function POST(req: NextRequest) {
   try {
     const { phone, password, action } = await req.json();
@@ -19,6 +18,13 @@ export async function POST(req: NextRequest) {
 
     if (action === 'register') {
       if (user) {
+        // If user exists but has no password yet, allow setting one for the first time
+        if (!user.passwordHash) {
+          const pwdHash = await hashUserPassword(password);
+          await db.update(schema.users).set({ passwordHash: pwdHash }).where(eq(schema.users.id, user.id));
+          const token = await signToken(user.id);
+          return NextResponse.json({ token, userId: user.id, phone: user.phone });
+        }
         return NextResponse.json({ error: '该手机号已注册，请直接登录' }, { status: 409 });
       }
       const pwdHash = await hashUserPassword(password);
@@ -32,7 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '该手机号未注册，请先注册' }, { status: 404 });
     }
     if (!user.passwordHash) {
-      return NextResponse.json({ error: '该账号未设置密码，请联系管理员' }, { status: 400 });
+      return NextResponse.json({ error: '该账号尚未设置密码，请切换到注册页面设置密码' }, { status: 400 });
     }
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
@@ -45,7 +51,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET: verify token
 export async function GET(req: NextRequest) {
   const token = getToken(req);
   if (!token) return NextResponse.json({ valid: false }, { status: 401 });
