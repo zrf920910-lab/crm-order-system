@@ -20,17 +20,16 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
   const [newSku, setNewSku] = useState({ skuCode: '', skuName: '', costPrice: '', unit: '' });
   const [customerPrices, setCustomerPrices] = useState<Record<string, string>>({});
 
-  // Fetch all SKUs for price mapping
-  useEffect(() => {
-    fetch('/api/skus?limit=200')
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setAllSkus(data);
-      })
-      .catch(console.error);
+  const fetchAllSkus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/skus?limit=500');
+      const data = await res.json();
+      if (Array.isArray(data)) setAllSkus(data);
+    } catch (e) { console.error(e); }
   }, []);
 
-  // Fetch SKUs by letter/search
+  useEffect(() => { fetchAllSkus(); }, [fetchAllSkus]);
+
   const fetchSkus = useCallback(async (letter: string) => {
     setLoading(true);
     try {
@@ -60,7 +59,6 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
     }
   }, [filterLetter, searchText, fetchSkus, searchSkus]);
 
-  // Batch fetch customer prices when customer or allSkus changes
   useEffect(() => {
     if (!selectedCustomer || allSkus.length === 0) {
       setCustomerPrices({});
@@ -90,14 +88,13 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
         body: JSON.stringify(newSku),
       });
       if (res.ok) {
+        const skuName = newSku.skuName;
         setNewSku({ skuCode: '', skuName: '', costPrice: '', unit: '' });
         setShowAddForm(false);
-        fetchSkus(filterLetter);
-        // Refresh allSkus
-        fetch('/api/skus?limit=200')
-          .then(r => r.json())
-          .then(data => { if (Array.isArray(data)) setAllSkus(data); })
-          .catch(console.error);
+        // Show the new SKU by searching for its name
+        setSearchText(skuName);
+        setFilterLetter('');
+        fetchAllSkus();
       }
     } catch (e) { console.error(e); }
   };
@@ -109,7 +106,6 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
 
   return (
     <div className="flex h-full">
-      {/* SKU List */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="p-3 border-b border-gray-200">
           <input
@@ -157,7 +153,9 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
           {loading ? (
             <div className="p-4 text-center text-gray-400 text-sm">加载中...</div>
           ) : skus.length === 0 ? (
-            <div className="p-4 text-center text-gray-400 text-sm">暂无SKU</div>
+            <div className="p-4 text-center text-gray-400 text-sm">
+              {searchText ? '无匹配SKU' : '暂无SKU，点击上方按钮新增'}
+            </div>
           ) : (
             <div className="divide-y divide-gray-100">
               {skus.map(sku => (
@@ -191,7 +189,6 @@ export default function Sidebar({ selectedCustomer, onSelectSku }: SidebarProps)
         </div>
       </div>
 
-      {/* Alphabet Index */}
       <div className="w-8 flex flex-col justify-center items-center border-l border-gray-200 bg-gray-50 py-2">
         {ALPHABET.map(letter => (
           <button

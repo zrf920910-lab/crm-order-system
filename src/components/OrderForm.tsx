@@ -17,50 +17,80 @@ interface Props {
   lineItems: LineItem[];
   onLineItemsChange: (items: LineItem[]) => void;
   onCustomerChange: (customer: Customer | null) => void;
+  onNewOrder: () => void;
 }
 
-export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChange, onCustomerChange }: Props) {
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '', notes: '' });
+export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChange, onCustomerChange, onNewOrder }: Props) {
+  // Customer input - directly editable
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [suggestions, setSuggestions] = useState<Customer[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const [stampImage, setStampImage] = useState<string>('');
   const [orderNotes, setOrderNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const [orderStarted, setOrderStarted] = useState(false);
   const stampInputRef = useRef<HTMLInputElement>(null);
-  const customerDropdownRef = useRef<HTMLDivElement>(null);
+  const customerInputRef = useRef<HTMLDivElement>(null);
 
-  // Customer search
+  // Sync customer fields when selectedCustomer changes
   useEffect(() => {
-    if (!customerSearch.trim()) {
-      setCustomerResults([]);
+    if (selectedCustomer) {
+      setCustomerName(selectedCustomer.name);
+      setCustomerPhone(selectedCustomer.phone || '');
+      setCustomerAddress(selectedCustomer.address || '');
+      setOrderStarted(true);
+    }
+  }, [selectedCustomer]);
+
+  // Customer name autocomplete
+  useEffect(() => {
+    if (!customerName.trim() || customerName.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+    // Don't show suggestions for already-selected customer
+    if (selectedCustomer && selectedCustomer.name === customerName) {
+      setSuggestions([]);
       return;
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/customers?q=${encodeURIComponent(customerSearch)}`);
+        const res = await fetch(`/api/customers?q=${encodeURIComponent(customerName)}`);
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setCustomerResults(data);
-          setShowCustomerDropdown(true);
+        if (Array.isArray(data) && data.length > 0) {
+          setSuggestions(data);
+          setShowSuggestions(true);
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { /* ignore */ }
     }, 300);
     return () => clearTimeout(timer);
-  }, [customerSearch]);
+  }, [customerName, selectedCustomer]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (customerDropdownRef.current && !customerDropdownRef.current.contains(e.target as Node)) {
-        setShowCustomerDropdown(false);
+      if (customerInputRef.current && !customerInputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const selectCustomerSuggestion = (c: Customer) => {
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone || '');
+    setCustomerAddress(c.address || '');
+    onCustomerChange(c);
+    setShowSuggestions(false);
+  };
+
+  const clearCustomerSelection = () => {
+    onCustomerChange(null);
+  };
 
   const updateLineItem = (index: number, field: keyof LineItem, value: string) => {
     const updated = [...lineItems];
@@ -77,24 +107,6 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
     onLineItemsChange(lineItems.filter((_, i) => i !== index));
   };
 
-  const handleCreateCustomer = async () => {
-    if (!newCustomer.name) return;
-    try {
-      const res = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCustomer),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        onCustomerChange(data);
-        setShowNewCustomerForm(false);
-        setNewCustomer({ name: '', phone: '', address: '', notes: '' });
-        setCustomerSearch('');
-      }
-    } catch (e) { console.error(e); }
-  };
-
   const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -106,15 +118,54 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
   const totalAmount = lineItems.reduce((sum, item) => sum + parseFloat(item.total || '0'), 0);
 
   const handleSave = async () => {
-    if (!selectedCustomer || lineItems.length === 0) return;
+    const name = customerName.trim();
+    if (!name || lineItems.length === 0) return;
+
     setSaving(true);
     try {
+      let customerId = selectedCustomer?.id;
+
+      // Auto-create customer if not selected from existing
+      if (!customerId) {
+        // Check if a customer with this name already exists
+        const checkRes = await fetch(`/api/customers?q=${encodeURIComponent(name)}`);
+        const checkData = await checkRes.json();
+        const existing = Array.isArray(checkData) ? checkData.find(
+          (c: Customer) => c.name.toLowerCase() === name.toLowerCase()
+        ) : null;
+
+        if (existing) {
+          customerId = existing.id;
+          onCustomerChange(existing);
+        } else {
+          // Create new customer
+          const createRes = await fetch('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              phone: customerPhone,
+              address: customerAddress,
+            }),
+          });
+          const newCust = await createRes.json();
+          if (createRes.ok) {
+            customerId = newCust.id;
+            onCustomerChange(newCust);
+          } else {
+            throw new Error('创建客户失败');
+          }
+        }
+      }
+
+      if (!customerId) throw new Error('无法确定客户');
+
       const orderNumber = `ORD-${Date.now()}`;
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: selectedCustomer.id,
+          customerId,
           items: lineItems.map(item => ({
             skuCode: item.skuCode,
             skuName: item.skuName,
@@ -128,21 +179,39 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
       });
       const data = await res.json();
       if (res.ok) {
-        setSavedMessage(`✓ 订单 ${orderNumber} 已保存到云端`);
+        setSavedMessage(`✓ 订单 ${orderNumber} 已保存`);
         setTimeout(() => setSavedMessage(''), 3000);
-        // Clear form for new order
+        // Reset everything
         onLineItemsChange([]);
+        onCustomerChange(null);
+        setCustomerName('');
+        setCustomerPhone('');
+        setCustomerAddress('');
         setOrderNotes('');
         setStampImage('');
+        setOrderStarted(false);
       } else {
         setSavedMessage(`✗ 保存失败: ${data.error}`);
         setTimeout(() => setSavedMessage(''), 4000);
       }
     } catch (e: any) {
-      setSavedMessage('✗ 网络错误，保存失败');
+      setSavedMessage(`✗ ${e.message || '保存失败'}`);
       setTimeout(() => setSavedMessage(''), 4000);
     }
     setSaving(false);
+  };
+
+  const handleStartNewOrder = () => {
+    onLineItemsChange([]);
+    onCustomerChange(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerAddress('');
+    setOrderNotes('');
+    setStampImage('');
+    setSavedMessage('');
+    setOrderStarted(true);
+    onNewOrder();
   };
 
   const handlePrintPDF = async () => {
@@ -151,13 +220,11 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
     const pageW = 210;
     let y = 15;
 
-    // Title
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('销 售 单', pageW / 2, y, { align: 'center' });
     y += 10;
 
-    // Order info
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     const orderNum = `ORD-${Date.now()}`;
@@ -165,18 +232,16 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
     doc.text(`日期: ${new Date().toLocaleDateString('zh-CN')}`, pageW - 15, y, { align: 'right' });
     y += 7;
 
-    // Customer info
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text(`客户: ${selectedCustomer?.name || '--'}`, 15, y);
+    doc.text(`客户: ${customerName || '--'}`, 15, y);
     y += 6;
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(`电话: ${selectedCustomer?.phone || '--'}`, 15, y);
-    doc.text(`地址: ${selectedCustomer?.address || '--'}`, pageW - 15, y, { align: 'right' });
+    doc.text(`电话: ${customerPhone || '--'}`, 15, y);
+    doc.text(`地址: ${customerAddress || '--'}`, pageW - 15, y, { align: 'right' });
     y += 10;
 
-    // Table
     const colX = [15, 25, 82, 115, 140, 165];
     doc.setFillColor(240, 240, 240);
     doc.rect(15, y, pageW - 30, 8, 'F');
@@ -237,78 +302,62 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
 
   return (
     <div className="flex flex-col h-full">
-      {/* Customer selection */}
+      {/* Customer Section */}
       <div className="p-4 border-b border-gray-200 space-y-3">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">客户:</label>
-          <div ref={customerDropdownRef} className="relative flex-1">
-            <input
-              type="text"
-              placeholder="搜索已有客户..."
-              value={selectedCustomer ? selectedCustomer.name : customerSearch}
-              onChange={e => {
-                setCustomerSearch(e.target.value);
-                if (selectedCustomer) onCustomerChange(null);
-              }}
-              onFocus={() => customerSearch && setShowCustomerDropdown(true)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {showCustomerDropdown && customerResults.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {customerResults.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      onCustomerChange(c);
-                      setCustomerSearch('');
-                      setShowCustomerDropdown(false);
-                    }}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100"
-                  >
-                    <div className="font-medium">{c.name}</div>
-                    {c.phone && <div className="text-xs text-gray-400">{c.phone}</div>}
-                  </button>
-                ))}
+        <div ref={customerInputRef} className="relative">
+          <label className="block text-xs text-gray-500 mb-1">客户名称</label>
+          <input
+            type="text"
+            placeholder="输入客户名称..."
+            value={customerName}
+            onChange={e => {
+              setCustomerName(e.target.value);
+              if (selectedCustomer && selectedCustomer.name !== e.target.value) {
+                clearCustomerSelection();
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+              {suggestions.map(c => (
                 <button
-                  onClick={() => {
-                    setShowNewCustomerForm(true);
-                    setShowCustomerDropdown(false);
-                    setNewCustomer(prev => ({ ...prev, name: customerSearch }));
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-green-50 text-sm text-green-600 font-medium"
+                  key={c.id}
+                  onClick={() => selectCustomerSuggestion(c)}
+                  className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100"
                 >
-                  + 新增客户 &quot;{customerSearch}&quot;
+                  <span className="font-medium">{c.name}</span>
+                  {c.phone && <span className="text-xs text-gray-400 ml-2">{c.phone}</span>}
                 </button>
-              </div>
-            )}
-          </div>
-          {selectedCustomer && (
-            <button onClick={() => onCustomerChange(null)} className="text-xs text-red-500 hover:text-red-700">清除</button>
+              ))}
+            </div>
           )}
         </div>
-
-        {showNewCustomerForm && (
-          <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <input type="text" placeholder="客户名称 *" value={newCustomer.name}
-                onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                className="px-2 py-1 border border-gray-300 rounded text-sm" />
-              <input type="text" placeholder="电话" value={newCustomer.phone}
-                onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                className="px-2 py-1 border border-gray-300 rounded text-sm" />
-            </div>
-            <input type="text" placeholder="地址" value={newCustomer.address}
-              onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-            <div className="flex gap-2">
-              <button onClick={handleCreateCustomer} className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">确认创建</button>
-              <button onClick={() => setShowNewCustomerForm(false)} className="px-3 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500">取消</button>
-            </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">电话</label>
+            <input
+              type="text"
+              placeholder="客户电话"
+              value={customerPhone}
+              onChange={e => setCustomerPhone(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-        )}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">地址</label>
+            <input
+              type="text"
+              placeholder="客户地址"
+              value={customerAddress}
+              onChange={e => setCustomerAddress(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Line items table */}
+      {/* Line Items Table */}
       <div className="flex-1 overflow-y-auto p-4">
         <table className="w-full text-sm">
           <thead>
@@ -383,7 +432,7 @@ export default function OrderForm({ selectedCustomer, lineItems, onLineItemsChan
           </div>
         </div>
         <div className="flex gap-3">
-          <button onClick={handleSave} disabled={saving || !selectedCustomer || lineItems.length === 0}
+          <button onClick={handleSave} disabled={saving || lineItems.length === 0 || !customerName.trim()}
             className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
             {saving ? '保存中...' : '保存订单到云端'}
           </button>

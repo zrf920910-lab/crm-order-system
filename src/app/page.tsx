@@ -17,6 +17,7 @@ interface LineItem {
 export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [orderKey, setOrderKey] = useState(0);
 
   const handleSelectSku = useCallback((sku: SkuPrice, customerPrice?: string) => {
     const price = customerPrice || sku.costPrice;
@@ -33,6 +34,12 @@ export default function Home() {
 
   const handleCustomerChange = useCallback((customer: Customer | null) => {
     setSelectedCustomer(customer);
+  }, []);
+
+  const handleNewOrder = useCallback(() => {
+    setLineItems([]);
+    setSelectedCustomer(null);
+    setOrderKey(k => k + 1);
   }, []);
 
   return (
@@ -54,14 +61,20 @@ export default function Home() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="p-3 border-b border-gray-200 bg-white flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-800">开单</h2>
-          <div className="text-xs text-gray-400">v1.0</div>
+          <button
+            onClick={handleNewOrder}
+            className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            + 新建订单
+          </button>
         </div>
-        <div className="flex-1 overflow-hidden bg-white">
+        <div className="flex-1 overflow-hidden bg-white" key={orderKey}>
           <OrderForm
             selectedCustomer={selectedCustomer}
             lineItems={lineItems}
             onLineItemsChange={setLineItems}
             onCustomerChange={handleCustomerChange}
+            onNewOrder={handleNewOrder}
           />
         </div>
       </div>
