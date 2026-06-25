@@ -129,27 +129,37 @@ export default function Home() {
 
   const handleStamp = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setStampImage(r.result as string); r.readAsDataURL(f); };
 
-  const handleSave = async () => {
-    const name = customerName.trim(); if (!name || lineItems.length === 0) return;
-    setSaving(true); setSavedMsg('');
+    const doSave = async (silent?: boolean) => {
+    const name = customerName.trim();
+    if (!name || lineItems.length === 0) return false;
     try {
       let cid = selectedCustomer?.id;
       if (!cid) {
         const cr = await fetch('/api/customers?q=' + encodeURIComponent(name)); const cd = await cr.json();
-        const ex = Array.isArray(cd) ? cd.find((c: Customer) => c.name === name) : null;
+        const ex = Array.isArray(cd) ? cd.find((c: any) => c.name === name) : null;
         if (ex) { cid = ex.id; setSelectedCustomer(ex); }
-        else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error || '创建客户失败'); cid = nc.id; setSelectedCustomer(nc); }
+        else { const nr = await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, phone: customerPhone, address: customerAddress }) }); const nc = await nr.json(); if (!nr.ok) throw new Error(nc.error); cid = nc.id; setSelectedCustomer(nc); }
       }
       const or = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerId: cid, items: lineItems, notes: orderNotes, stampImage, orderNumber: 'ORD-' + Date.now() }) });
       const od = await or.json(); if (!or.ok) throw new Error(od.error || '保存失败');
-      setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); newOrder();
-    } catch (e: any) { setSavedMsg(e.message); setTimeout(() => setSavedMsg(''), 4000); }
+      if (!silent) { setSavedMsg('订单已保存'); setTimeout(() => setSavedMsg(''), 3000); }
+      return true;
+    } catch (e: any) { if (!silent) { setSavedMsg(e.message); setTimeout(() => setSavedMsg(''), 4000); } return false; }
+  };
+
+  const handleSave = async () => {
+    setSaving(true); setSavedMsg('');
+    const ok = await doSave(false);
+    if (ok) newOrder();
     setSaving(false);
   };
 
     // Save preview as image
   const handleSaveImage = async () => {
     setSavingImg(true);
+    setSavedMsg('正在保存...');
+    const saved = await doSave(true);
+    if (!saved) { setSavingImg(false); setSavedMsg('保存失败，请重试'); setTimeout(() => setSavedMsg(''), 3000); return; }
     try {
       const html2canvas = (await import('html2canvas')).default;
       const el = previewRef.current; if (!el) { setSavingImg(false); return; }
@@ -162,6 +172,9 @@ export default function Home() {
   // PDF with Chinese support via html2canvas
   const handlePrint = async () => {
     setPrinting(true);
+    setSavedMsg('正在保存...');
+    const saved = await doSave(true);
+    if (!saved) { setPrinting(false); setSavedMsg('保存失败，请重试'); setTimeout(() => setSavedMsg(''), 3000); return; }
     try {
       const html2canvas = (await import('html2canvas')).default;
       const el = previewRef.current; if (!el) { setPrinting(false); return; }
