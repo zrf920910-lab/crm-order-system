@@ -1,0 +1,22 @@
+{
+  "name": "客户管理与SKU价格管理系统",
+  "short_name": "订单管理",
+  "description": "PWA客户订单管理系统 - SKU价格管理、开单、PDF打印",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f3f4f6",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

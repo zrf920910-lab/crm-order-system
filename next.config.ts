@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ['@vercel/postgres'],
+  turbopack: {
+    resolveAlias: {
+      canvas: './src/lib/canvas-stub.ts',
+    },
+  },
 };
 
 export default nextConfig;
