@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, decimal, integer, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, boolean, decimal, integer, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const customers = pgTable('customers', {
   id: serial('id').primaryKey(),
@@ -16,6 +16,7 @@ export const skuPrices = pgTable('sku_prices', {
   brand: varchar('brand', { length: 100 }).default(''),
   costPrice: decimal('cost_price', { precision: 12, scale: 2 }).default('0'),
   unit: varchar('unit', { length: 50 }).default(''),
+  deleted: boolean("deleted").default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -46,6 +47,7 @@ export const orderItems = pgTable('order_items', {
   skuName: varchar('sku_name', { length: 255 }).notNull(),
   brand: varchar('brand', { length: 100 }).default(''),
   unit: varchar('unit', { length: 50 }).default(''),
+  deleted: boolean("deleted").default(false),
   quantity: decimal('quantity', { precision: 10, scale: 2 }).default('1'),
   unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).default('0'),
   total: decimal('total', { precision: 12, scale: 2 }).default('0'),
