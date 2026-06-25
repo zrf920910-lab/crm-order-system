@@ -41,7 +41,6 @@ export default function Home() {
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
   const [savingImg, setSavingImg] = useState(false);
-  const [savingImg, setSavingImg] = useState(false);
   const [companyName, setCompanyName] = useState('佛山市南海区朔安消防器材商行');
   const [preparerName, setPreparerName] = useState('');
   const stampRef = useRef<HTMLInputElement>(null);
@@ -150,20 +149,6 @@ export default function Home() {
 
     // Save preview as image
   const handleSaveImage = async () => {
-    setSavingImg(true);
-    try {
-      const html2canvas = (await import('html2canvas')).default;
-      const el = previewRef.current; if (!el) { setSavingImg(false); return; }
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const link = document.createElement('a');
-      link.download = 'ORD-' + Date.now() + '.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch (e) { console.error(e); }
-    setSavingImg(false);
-  };
-
-    const handleSaveImage = async () => {
     setSavingImg(true);
     try {
       const html2canvas = (await import('html2canvas')).default;
@@ -307,7 +292,8 @@ export default function Home() {
               <div><label className="text-xs text-gray-500 mb-0.5 block">公章</label><input ref={stampRef} type="file" accept="image/*" onChange={handleStamp} className="hidden" /><button onClick={() => stampRef.current?.click()} className={'px-2 py-1.5 text-xs rounded border ' + (stampImage ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50')}>{stampImage ? '已上传' : '上传公章'}</button></div>
             </div>
           </div>
-          <div className="flex gap-2"><button onClick={handleSave} disabled={saving || lineItems.length === 0 || !customerName.trim()} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{saving ? '保存中...' : '保存订单'}</button><button onClick={handlePrint} disabled={printing || lineItems.length === 0} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{printing ? '生成中...' : '打印PDF'}</button></div>
+          <div className="flex gap-2"><button onClick={handleSave} disabled={saving || lineItems.length === 0 || !customerName.trim()} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{saving ? '保存中...' : '保存订单'}</button><button onClick={handleSaveImage} disabled={savingImg || lineItems.length === 0} className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{savingImg ? '导出中...' : '保存图片'}</button>
+            <button onClick={handlePrint} disabled={printing || lineItems.length === 0} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">{printing ? '生成中...' : '打印PDF'}</button></div>
           {savedMsg && <div className={'text-xs text-center py-1 rounded font-medium ' + (savedMsg.startsWith('订单已保存') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50')}>✓ {savedMsg}</div>}
         </div>
       </div>
