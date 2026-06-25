@@ -12,7 +12,7 @@ export default function Home() {
   // SKU state
   const [skus, setSkus] = useState<Sku[]>([]);
   const [allSkus, setAllSkus] = useState<Sku[]>([]);
-  const [filterLetter, setFilterLetter] = useState('A');
+  const [filterLetter, setFilterLetter] = useState('');
   const [searchText, setSearchText] = useState('');
   const [skuLoading, setSkuLoading] = useState(false);
   const [showAddSku, setShowAddSku] = useState(false);
@@ -241,7 +241,7 @@ export default function Home() {
           </div>
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
-              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l && !searchText ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
+              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : (!filterLetter && l === '#' ? 'text-blue-600 font-bold' : 'text-gray-500'))}>{l}</button>))}
             </div>
           )}
         </div>
