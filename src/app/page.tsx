@@ -35,6 +35,7 @@ export default function Home() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [orderNotes, setOrderNotes] = useState('');
   const [stampImage, setStampImage] = useState('');
+  const [stampPos, setStampPos] = useState({ x: 0, y: 0 }); const [draggingStamp, setDraggingStamp] = useState(false);
   const [saving, setSaving] = useState(false); const [savedMsg, setSavedMsg] = useState('');
   const [printing, setPrinting] = useState(false);
   const stampRef = useRef<HTMLInputElement>(null);
@@ -115,7 +116,7 @@ export default function Home() {
   };
   const removeItem = (idx: number) => setLineItems(p => p.filter((_, i) => i !== idx));
 
-  const newOrder = () => { setLineItems([]); setSelectedCustomer(null); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setOrderNotes(''); setStampImage(''); setSavedMsg(''); };
+  const newOrder = () => { setLineItems([]); setSelectedCustomer(null); setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setOrderNotes(''); setStampImage(''); setStampPos({ x: 0, y: 0 }); setSavedMsg(''); };
 
   const handleStamp = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = () => setStampImage(r.result as string); r.readAsDataURL(f); };
 
@@ -160,6 +161,10 @@ export default function Home() {
     } catch (e) { console.error(e); }
     setPrinting(false);
   };
+
+    const stampDragStart = (e: React.MouseEvent) => { e.preventDefault(); setDraggingStamp(true); };
+  const stampDragMove = (e: React.MouseEvent) => { if (!draggingStamp) return; setStampPos(p => ({ x: p.x + e.movementX, y: p.y + e.movementY })); };
+  const stampDragEnd = () => { setDraggingStamp(false); };
 
   const totalAmount = lineItems.reduce((s, i) => s + parseFloat(i.total || '0'), 0);
 
@@ -241,7 +246,7 @@ export default function Home() {
       </div>
 
       {/* RIGHT: Preview */}
-      <div className="w-[320px] bg-gray-50 border-l border-gray-200 flex flex-col shrink-0">
+      <div className="flex-1 bg-gray-50 border-l border-gray-200 flex flex-col min-w-0">
         <div className="p-2.5 bg-white border-b text-sm font-bold text-gray-700">打印预览</div>
         <div className="flex-1 overflow-y-auto p-3">
           <div ref={previewRef} className="bg-white p-4 shadow-md" style={{ fontFamily: 'sans-serif', fontSize: '10px' }}>
@@ -256,7 +261,12 @@ export default function Home() {
             </table>
             {lineItems.length > 0 && (<><div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', marginBottom: '6px' }}>合计: ¥{totalAmount.toFixed(2)}</div><div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>大写: {numCN(totalAmount)}</div></>)}
             {orderNotes && <div style={{ fontSize: '10px', marginBottom: '8px', color: '#555' }}>备注: {orderNotes}</div>}
-            {stampImage && <div style={{ textAlign: 'right', marginTop: '10px' }}><img src={stampImage} alt="公章" style={{ width: '80px', height: '80px', opacity: 0.8 }} /></div>}
+            {stampImage && <div style={{ position: 'relative', marginTop: '10px', minHeight: '100px' }}>
+                <img src={stampImage} alt="公章" draggable={false}
+                  onMouseDown={stampDragStart} onMouseMove={stampDragMove} onMouseUp={stampDragEnd} onMouseLeave={stampDragEnd}
+                  style={{ position: 'absolute', right: (80 + stampPos.x) + 'px', top: stampPos.y + 'px', width: '80px', height: '80px', opacity: 0.8, cursor: draggingStamp ? 'grabbing' : 'grab', userSelect: 'none' }} />
+                <div style={{ fontSize: '9px', color: '#999', marginTop: '5px' }}>拖拽公章可调整位置</div>
+              </div>}
             <div style={{ marginTop: '15px', fontSize: '10px' }}><div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px' }}>制单人:</div><div style={{ display: 'inline-block', width: '45%', borderTop: '1px solid #999', paddingTop: '2px', marginLeft: '10%' }}>签收人:</div></div>
           </div>
         </div>
