@@ -207,7 +207,26 @@ export default function Home() {
     setPrinting(false);
   };
 
-    const viewOrderDetail = async (orderId: number) => {
+    const reopenOrder = (orderData: any) => {
+    if (orderData.customer) {
+      setCustomerName(orderData.customer.name || '');
+      setCustomerPhone(orderData.customer.phone || '');
+      setCustomerAddress(orderData.customer.address || '');
+      setSelectedCustomer(orderData.customer);
+    }
+    if (orderData.items) {
+      setLineItems(orderData.items.map((item: any) => ({
+        skuName: item.skuName, brand: item.brand || '', unit: item.unit || '',
+        quantity: item.quantity, unitPrice: item.unitPrice, total: item.total,
+      })));
+    }
+    if (orderData.notes) setOrderNotes(orderData.notes);
+    setStampImage(orderData.stampImage || '');
+    setShowHistory(false);
+    setSelectedOrder(null);
+  };
+
+  const viewOrderDetail = async (orderId: number) => {
     try { const r = await fetch('/api/orders/' + orderId); const d = await r.json(); setSelectedOrder(d); } catch {}
   };
 
