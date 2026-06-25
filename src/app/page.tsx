@@ -161,6 +161,7 @@ export default function Home() {
   const [showCustRecycle, setShowCustRecycle] = useState(false);
   const [recycleCusts, setRecycleCusts] = useState<Customer[]>([]);
   const [selCustIds, setSelCustIds] = useState<Set<number>>(new Set());
+  const skuListRef = useRef<HTMLDivElement>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -320,6 +321,21 @@ export default function Home() {
       else setImportResult(d.error || '导入失败');
     } catch { setImportResult('网络错误'); }
   };
+
+  const scrollToLetter = (l: string) => {
+    setFilterLetter(l);
+    const el = skuListRef.current;
+    if (!el) return;
+    const children = el.children;
+    for (let i = 0; i < children.length; i++) {
+      const text = (children[i].textContent || '').trim();
+      if (text && getPinyinInitial(text) === l) {
+        children[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
+        break;
+      }
+    }
+  };
+  const scrollToTop = () => { setFilterLetter(''); const el = skuListRef.current; if (el) el.scrollTop = 0; };
 
   const handleRestore = async () => {
     if (selectedIds.size === 0) return;
@@ -547,7 +563,7 @@ export default function Home() {
           </div>
         )}
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" ref={skuListRef}>
             {skuLoading ? <div className="p-3 text-center text-gray-400 text-xs">加载中...</div>
             : showRecycleBin ? (
               recycleSkus.length === 0 ? <div className="p-3 text-center text-gray-400 text-xs">回收站为空</div>
@@ -582,8 +598,9 @@ export default function Home() {
           {!showRecycleBin && (
             <div className="w-7 flex flex-col justify-center items-center border-l bg-gray-50 py-1">
               <button onClick={() => { setSearchText(''); setFilterLetter(''); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400')}>全部</button>
-              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); setFilterLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
-            <button onClick={() => { setSearchText(''); setFilterLetter('0-9'); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === '0-9' ? 'text-blue-600 font-bold' : 'text-gray-500')}>0-9</button>
+              <button onClick={() => { setSearchText(''); scrollToTop(); }} className={"w-full text-center text-xs py-0.5 font-medium " + (!filterLetter ? 'text-blue-600 font-bold bg-blue-50 rounded' : 'text-gray-400 hover:text-blue-600')}>全部</button>
+              {ALPHABET.map(l => (<button key={l} onClick={() => { setSearchText(''); scrollToLetter(l); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === l ? 'text-blue-600 font-bold' : 'text-gray-500')}>{l}</button>))}
+            <button onClick={() => { setSearchText(''); scrollToLetter('0-9'); }} className={"w-full text-center text-xs py-0.5 hover:text-blue-600 " + (filterLetter === '0-9' ? 'text-blue-600 font-bold' : 'text-gray-500')}>0-9</button>
             </div>
           )}
         </div>
