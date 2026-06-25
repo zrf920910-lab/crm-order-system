@@ -57,7 +57,14 @@ export async function DELETE(
   const uid = await getUid(req); if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const { id } = await params;
-    await db.delete(schema.customers).where(and(eq(schema.customers.id, parseInt(id)), eq(schema.customers.userId, uid)));
+    const { searchParams } = new URL(req.url);
+    const permanent = searchParams.get('permanent') === '1';
+    if (permanent) {
+      await db.delete(schema.customerPrices).where(eq(schema.customerPrices.customerId, parseInt(id)));
+      await db.delete(schema.customers).where(and(eq(schema.customers.id, parseInt(id)), eq(schema.customers.userId, uid)));
+    } else {
+      await db.update(schema.customers).set({ deleted: true, updatedAt: new Date() }).where(and(eq(schema.customers.id, parseInt(id)), eq(schema.customers.userId, uid)));
+    }
     return NextResponse.json({ success: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

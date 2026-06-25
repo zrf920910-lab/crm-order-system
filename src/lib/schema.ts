@@ -14,6 +14,7 @@ export const customers = pgTable('customers', {
   phone: varchar('phone', { length: 50 }).default(''),
   address: text('address').default(''),
   notes: text('notes').default(''),
+  deleted: boolean('deleted').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

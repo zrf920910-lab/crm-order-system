@@ -58,6 +58,7 @@ export default function Home() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const loadRecycleCusts = async () => { try { const r = await fetch('/api/customers?limit=200&deleted=1', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setRecycleCusts(d); } catch {} };
   const loadCustList = async () => {
     try { const r = await fetch('/api/customers?limit=200', { headers: headers() }); const d = await r.json(); if (Array.isArray(d)) setCustList(d); } catch {}
   };
@@ -77,14 +78,25 @@ export default function Home() {
       setEditCust(null); setCustSaveMsg('修改成功'); loadCustList(); loadAllCustomers(); setTimeout(() => setCustSaveMsg(''), 2000);
     } catch { setCustSaveMsg('网络错误'); }
   };
+  const toggleSelCust = (id: number) => { setSelCustIds(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
   const deleteCustomer = (c: Customer) => { setDelCustTarget(c); };
   const confirmDeleteCust = async () => {
     if (!delCustTarget) return;
     try {
       const r = await fetch('/api/customers/' + delCustTarget.id, { method: 'DELETE', headers: headers() });
-      if (r.ok || r.status === 200) { loadCustList(); loadAllCustomers(); }
+      loadCustList(); loadAllCustomers(); loadRecycleCusts();
     } catch {}
     setDelCustTarget(null);
+  };
+  const bulkRestoreCusts = async () => {
+    if (selCustIds.size === 0) return;
+    await fetch('/api/customers?ids=' + [...selCustIds].join(',') + '&restore=1', { method: 'DELETE', headers: headers() });
+    setSelCustIds(new Set()); loadRecycleCusts(); loadCustList(); loadAllCustomers();
+  };
+  const bulkPermDeleteCusts = async () => {
+    if (selCustIds.size === 0 || !confirm('确定永久删除选中的客户？此操作不可恢复！')) return;
+    await fetch('/api/customers?ids=' + [...selCustIds].join(',') + '&permanent=1', { method: 'DELETE', headers: headers() });
+    setSelCustIds(new Set()); loadRecycleCusts();
   };
   const openHistory = () => { setShowHistory(true); loadOrders(); };
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -114,6 +126,9 @@ export default function Home() {
   const [newCustAddr, setNewCustAddr] = useState('');
   const [custSaveMsg, setCustSaveMsg] = useState('');
   const [delCustTarget, setDelCustTarget] = useState<Customer | null>(null);
+  const [showCustRecycle, setShowCustRecycle] = useState(false);
+  const [recycleCusts, setRecycleCusts] = useState<Customer[]>([]);
+  const [selCustIds, setSelCustIds] = useState<Set<number>>(new Set());
   const stampRef = useRef<HTMLInputElement>(null);
   const custRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -687,8 +702,11 @@ export default function Home() {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustMgmt(false)}>
         <div className="bg-white rounded-xl shadow-2xl w-[650px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="text-lg font-bold">客户管理</h3>
-            <button onClick={() => setShowCustMgmt(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            <h3 className="text-lg font-bold">{showCustRecycle ? '客户回收站' : '客户管理'}</h3>
+            <div className="flex items-center gap-2">
+              <button onClick={() => { setShowCustRecycle(!showCustRecycle); setSelCustIds(new Set()); if (!showCustRecycle) loadRecycleCusts(); else loadCustList(); }} className="text-xs bg-gray-100 px-2 py-1 rounded hover:bg-gray-200">{showCustRecycle ? '返回列表' : '回收站'}</button>
+              <button onClick={() => setShowCustMgmt(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
           </div>
           <div className="p-4 border-b bg-gray-50 space-y-2">
             <div className="text-xs text-gray-500 font-medium">新增客户</div>
@@ -700,8 +718,28 @@ export default function Home() {
             </div>
             {custSaveMsg && <div className={custSaveMsg.includes("成功") ? "text-green-600 text-xs" : "text-red-600 text-xs"}>{custSaveMsg}</div>}
           </div>
+          {showCustRecycle && recycleCusts.length > 0 && (
+            <div className="px-4 py-2 border-b bg-gray-50 flex gap-2">
+              <button onClick={bulkRestoreCusts} disabled={selCustIds.size === 0} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300">恢复({selCustIds.size})</button>
+              <button onClick={bulkPermDeleteCusts} disabled={selCustIds.size === 0} className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:bg-gray-300">永久删除({selCustIds.size})</button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-2">
-            {custList.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">暂无客户</div> :
+            {showCustRecycle ? (recycleCusts.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">回收站为空</div> :
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-100 border-b"><th className="p-2 w-8"></th><th className="p-2 text-left">客户名称</th><th className="p-2 text-left">电话</th><th className="p-2 text-center w-16">操作</th></tr></thead>
+              <tbody>
+                {recycleCusts.map(c => (
+                  <tr key={c.id} className="border-b hover:bg-gray-50">
+                    <td className="p-2"><input type="checkbox" checked={selCustIds.has(c.id)} onChange={() => toggleSelCust(c.id)} /></td>
+                    <td className="p-2">{c.name}</td>
+                    <td className="p-2 text-gray-500">{c.phone}</td>
+                    <td className="p-2 text-center"><button onClick={() => setDelCustTarget(c)} className="text-xs text-red-500 hover:underline">删除</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>)
+            : (custList.length === 0 ? <div className="text-center py-8 text-gray-400 text-sm">暂无客户</div> :
             <table className="w-full text-sm">
               <thead><tr className="bg-gray-100 border-b"><th className="p-2 text-left">客户名称</th><th className="p-2 text-left w-32">电话</th><th className="p-2 text-left w-48">地址</th><th className="p-2 text-center w-20">操作</th></tr></thead>
               <tbody>
@@ -720,13 +758,13 @@ export default function Home() {
                       <td className="p-2 text-gray-500 truncate max-w-[200px]">{c.address}</td>
                       <td className="p-2 text-center">
                         <button onClick={() => setEditCust({...c})} className="text-xs text-blue-600 hover:underline mr-2">编辑</button>
-                        <button onClick={() => deleteCustomer(c)} className="text-xs text-red-500 hover:underline">删除</button>
+                        <button onClick={() => showCustRecycle ? setDelCustTarget(c) : deleteCustomer(c)} className="text-xs text-red-500 hover:underline">删除</button>
                       </td>
                     </tr>
                   )
                 ))}
               </tbody>
-            </table>}
+            </table>)}
           </div>
         </div>
       </div>
