@@ -297,32 +297,69 @@ export default function Home() {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'SKU列表_' + new Date().toLocaleDateString('zh-CN') + '.csv'; a.click();
   };
   const handleImport = async () => {
-    const lines = importText.trim().split('\n').filter(l => l.trim());
+    const raw = importText.replace(/\r/g, '').trim();
+    const lines = raw.split('\n').filter(l => l.trim());
     if (lines.length < 2) { setImportResult('请粘贴表头和至少一行数据'); return; }
-    const header = lines[0].split('\t').map((h) => h.trim());
-    const nameIdx = header.findIndex((h) => h.includes('名称') || h.includes('产品') || h.includes('商品') || h === 'skuName');
-    const priceIdx = header.findIndex((h) => h.includes('价格') || h.includes('价') || h.includes('进货') || h === 'costPrice' || h === 'price');
-    const brandIdx = header.findIndex((h) => h.includes('品牌') || h === 'brand');
-    const unitIdx = header.findIndex((h) => h.includes('单位') || h === 'unit');
+    
+    // Auto-detect separator: count tabs, commas, semicolons in first 3 lines
+    let sample = lines.slice(0, Math.min(3, lines.length)).join('\n');
+    const tabCount = (sample.match(/\t/g) || []).length;
+    const commaCount = (sample.match(/,/g) || []).length;
+    const semiCount = (sample.match(/;/g) || []).length;
+    let sep = '\t';
+    if (commaCount > tabCount && commaCount > semiCount) sep = ',';
+    else if (semiCount > tabCount && semiCount > commaCount) sep = ';';
+    
+    const header = lines[0].split(sep).map((h: string) => h.trim().replace(/^["']|["']$/g, '').replace(/\s+/g, ''));
+    
+    // Flexible header matching
+    const nameIdx = header.findIndex((h: string) => 
+      h.includes('名称') || h.includes('产品') || h.includes('商品') || h.includes('货品') ||
+      h === 'skuName' || h === 'name' || h === 'product' || h === 'item');
+    const priceIdx = header.findIndex((h: string) => 
+      h.includes('价格') || h.includes('价') || h.includes('进货') || h.includes('售价') || h.includes('单价') ||
+      h === 'costPrice' || h === 'price' || h === 'cost');
+    const brandIdx = header.findIndex((h: string) => 
+      h.includes('品牌') || h.includes('牌子') || h === 'brand');
+    const unitIdx = header.findIndex((h: string) => 
+      h.includes('单位') || h === 'unit' || h === 'Unit');
+    
+    // Fallback: if no header match, try first 2 columns as name + price
+    if (nameIdx < 0 && header.length >= 2) {
+      // Assume col 0 is name, find price in remaining columns
+    }
+    
+    const cleanPrice = (v: string) => {
+      if (!v) return '0';
+      // Strip: ¥ $ 元 , spaces, single quotes
+      let cleaned = v.replace(/[¥$￥元,，\s'"]/g, '').trim();
+      // If starts with 'CNY' etc
+      cleaned = cleaned.replace(/^[A-Za-z]+/i, '');
+      return cleaned || '0';
+    };
+    
     const rows = [];
+    let parseErrors = 0;
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split('\t');
-      const name = nameIdx >= 0 ? (cols[nameIdx] || '').trim() : '';
-      if (!name) continue;
+      const cols = lines[i].split(sep).map((c: string) => c.trim().replace(/^["']|["']$/g, ''));
+      const name = nameIdx >= 0 ? (cols[nameIdx] || '') : (cols[0] || '');
+      if (!name || name.length < 1) continue;
+      // Skip header-like rows
+      if (name === header[nameIdx] || name === '商品名称' || name === '产品名称') continue;
       rows.push({
         skuName: name,
-        brand: brandIdx >= 0 ? (cols[brandIdx] || '').trim() : '',
-        costPrice: priceIdx >= 0 ? (cols[priceIdx] || '0').trim() : '0',
-        unit: unitIdx >= 0 ? (cols[unitIdx] || '').trim() : '',
+        brand: brandIdx >= 0 ? (cols[brandIdx] || '') : '',
+        costPrice: priceIdx >= 0 ? cleanPrice(cols[priceIdx] || '0') : '0',
+        unit: unitIdx >= 0 ? (cols[unitIdx] || '') : '',
       });
     }
-    if (rows.length === 0) { setImportResult('未找到有效数据'); return; }
+    if (rows.length === 0) { setImportResult('未找到有效数据（检测到分隔符: ' + (sep === '\t' ? 'Tab' : sep) + '，表头: ' + header.slice(0,5).join(',') + '）'); return; }
     try {
       const r = await fetch('/api/skus/import', { method: 'POST', headers: headers(), body: JSON.stringify({ rows }) });
       const d = await r.json();
-      if (r.ok) { setImportResult('导入 ' + d.imported + ' 条，跳过 ' + d.skipped + ' 条'); loadAllSkus(); setTimeout(() => setShowImport(false), 1500); }
+      if (r.ok) { setImportResult('导入 ' + d.imported + ' 条' + (d.skipped > 0 ? '，跳过 ' + d.skipped + ' 条（已存在）' : '')); loadAllSkus(); setTimeout(() => setShowImport(false), 1500); }
       else setImportResult(d.error || '导入失败');
-    } catch { setImportResult('网络错误'); }
+    } catch { setImportResult('网络错误，请重试'); }
   };
 
   const scrollToLetter = (l: string) => {
@@ -752,8 +789,8 @@ export default function Home() {
             <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
           </div>
           <div className="p-4 space-y-3">
-            <div className="text-xs text-gray-500">从Excel或Google表格复制数据，粘贴到下方（Tab分隔）：</div>
-            <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">第一行为表头（需包含名称和价格列），之后每行一条SKU</div>
+            <div className="text-xs text-gray-500">从Excel/Google表格/WPS复制数据粘贴到下方（自动识别Tab/逗号/分号分隔）：</div>
+            <div className="text-xs text-gray-400 bg-gray-50 p-2 rounded">第一行为表头（程序会自动识别名称和价格列），之后每行一条SKU</div>
             <textarea value={importText} onChange={e => setImportText(e.target.value)}
               placeholder={"商品名称\t进货价(元)\n超细悬挂干粉4kg\t100\n呼救器\t45"}
               className="w-full h-48 px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
